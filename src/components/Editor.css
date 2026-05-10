@@ -8,10 +8,18 @@
 }
 
 .editor-header {
-  padding: 12px 24px;
+  padding: 12px 0;
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--divider-color);
+  width: 100%;
+}
+
+.editor-header-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 40px;
 }
 
 .file-name {
@@ -47,4 +55,50 @@
 .cm-scroller {
   overflow: auto !important;
   flex: 1;
+}
+
+.cm-codeblock-line {
+  background-color: var(--background-modifier-hover);
+  font-family: var(--font-monospace);
+}
+
+.cm-table {
+  font-family: var(--font-text);
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cm-table th, .cm-table td {
+  border: 1px solid var(--background-modifier-border) !important;
+  padding: 8px 12px;
+}
+
+.cm-table th {
+  background-color: var(--background-secondary) !important;
+  font-weight: bold;
+}
+
+.cm-hr {
+  display: block;
+  width: 100%;
+  border: none;
+  border-top: 2px solid var(--divider-color);
+  margin: 24px 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cm-list-bullet {
+  color: transparent !important;
+  display: inline-block;
+  width: 1.2em;
+  position: relative;
+}
+
+.cm-list-bullet::after {
+  content: "•";
+  color: var(--text-normal);
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: bold;
 }

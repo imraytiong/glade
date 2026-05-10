@@ -40,6 +40,7 @@
   flex-direction: column;
   background-color: var(--background-primary);
   min-height: 0;
+  min-width: 0;
 }
 
 .editor-container {

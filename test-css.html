@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.cm-hr-line {
+  color: transparent !important;
+  border-bottom: 2px solid red;
+  height: 20px;
+  width: 100%;
+}
+.cm-list-bullet {
+  color: transparent;
+  display: inline-block;
+  width: 1em;
+  position: relative;
+}
+.cm-list-bullet::after {
+  content: "•";
+  color: black;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+</style>
+</head>
+<body>
+  <div class="cm-hr-line">---</div>
+  <br/>
+  <div><span class="cm-list-bullet">* </span>Some text</div>
+</body>
+</html>

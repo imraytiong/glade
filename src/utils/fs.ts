@@ -14,7 +14,6 @@ export async function readVaultRecursive(dirPath: string): Promise<FileNode[]> {
     const nodes: FileNode[] = [];
 
     for (const entry of entries) {
-      // Ignore hidden files and .git, .obsidian folders
       if (entry.name && entry.name.startsWith('.')) {
         continue;
       }
@@ -38,7 +37,6 @@ export async function readVaultRecursive(dirPath: string): Promise<FileNode[]> {
       }
     }
 
-    // Sort: directories first, then files
     return nodes.sort((a, b) => {
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;

@@ -13,7 +13,7 @@ Here is a blockquote:
 > This is a blockquote.
 > It can span multiple lines.
 > > And can be nested.
-
+  
 Here is an unordered list:
 - Item 1
 - Item 2
@@ -29,7 +29,7 @@ Here is an ordered list:
    2. Nested second item
 
 Here is a checklist (interactive):
-- [ ] Incomplete task
+- [x] Incomplete task
 - [x] Completed task
 - [ ] Another pending task
 
@@ -50,3 +50,9 @@ ___
 
 Finally, an image:
 ![Sample Image Placeholder](https://via.placeholder.com/150)
+
+Here is a table:
+| Column 1 | Column 2 | Column 3 |
+| -------- | -------- | -------- |
+| Row 1 A  | Row 1 B  | Row 1 C  |
+| Row 2 A  | Row 2 B  | Row 2 C  |

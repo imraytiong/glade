@@ -25,7 +25,7 @@ function App() {
     return saved ? parseInt(saved, 10) : -1;
   });
 
-  const [fileContent, setFileContent] = useState<string>('');
+
 
   // Persistence
   useEffect(() => {
@@ -61,6 +61,8 @@ function App() {
     }
   }, [vaultPath, loadVaultFiles]);
 
+  const [activeFileContent, setActiveFileContent] = useState<{ path: string, content: string } | null>(null);
+
   // Load File Content when active tab changes
   useEffect(() => {
     const loadContent = async () => {
@@ -70,13 +72,13 @@ function App() {
         try {
           const content = await readTextFile(file.path);
           console.log("Loaded content length:", content.length);
-          setFileContent(content);
+          setActiveFileContent({ path: file.path, content });
         } catch (err) {
           console.error('Failed to read active file', err);
-          setFileContent(`Error loading file: ${err}`);
+          setActiveFileContent({ path: file.path, content: `Error loading file: ${err}` });
         }
       } else {
-        setFileContent('');
+        setActiveFileContent(null);
       }
     };
     loadContent();
@@ -188,13 +190,17 @@ function App() {
               </div>
             ) : (
               <div className="editor-container">
-                <Editor 
-                  // Use key to force unmount/remount when file changes, ensuring clean state
-                  key={activeFile.path}
-                  initialContent={fileContent} 
-                  onSave={handleSaveFile} 
-                  fileName={activeFile.name}
-                />
+                {activeFileContent && activeFileContent.path === activeFile.path ? (
+                  <Editor 
+                    key={activeFileContent.path}
+                    initialContent={activeFileContent.content} 
+                    onSave={handleSaveFile} 
+                    fileName={activeFile.name}
+                    filePath={activeFile.path}
+                  />
+                ) : (
+                  <div className="loading-editor" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-faint)' }}>Loading...</div>
+                )}
               </div>
             )}
           </div>

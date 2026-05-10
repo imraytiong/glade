@@ -5,16 +5,19 @@ import { languages } from '@codemirror/language-data';
 import { EditorView } from '@codemirror/view';
 import './Editor.css';
 
+import { convertFileSrc } from '@tauri-apps/api/core';
+
 interface EditorProps {
   initialContent: string;
   onSave: (content: string) => void;
   fileName: string;
+  filePath: string;
 }
 
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { RangeSetBuilder } from '@codemirror/state';
 import { tags as t } from '@lezer/highlight';
-import { Decoration, DecorationSet, MatchDecorator, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
+import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 
 class CheckboxWidget extends WidgetType {
   constructor(readonly checked: boolean) { super(); }
@@ -34,115 +37,254 @@ class CheckboxWidget extends WidgetType {
   ignoreEvent() { return false; }
 }
 
-const checkboxMatcher = new MatchDecorator({
-  regexp: /- \[(x| |X)\]/g,
-  decoration: match => Decoration.replace({
-    widget: new CheckboxWidget(match[1].toLowerCase() === "x")
-  })
-});
+
 
 const checkboxInteraction = EditorView.domEventHandlers({
-  change(event, view) {
+  mousedown(event, view) {
     const target = event.target as HTMLElement;
     if (target.classList.contains("cm-todo-checkbox")) {
-      const isChecked = (target as HTMLInputElement).checked;
+      event.preventDefault(); // Prevent cursor from moving to the line
+      const isChecked = !(target as HTMLInputElement).checked; // Toggle the state
       const pos = view.posAtDOM(target);
       if (pos !== null) {
         const line = view.state.doc.lineAt(pos);
-        const regex = /- \[(x| |X)\]/g;
-        let match;
-        while ((match = regex.exec(line.text)) !== null) {
-          const matchStart = line.from + match.index;
-          const matchEnd = matchStart + 5;
-          if (pos >= matchStart && pos <= matchEnd) {
-            const replaceFrom = matchStart + 3;
-            const replaceTo = replaceFrom + 1;
-            view.dispatch({
-              changes: {
-                from: replaceFrom,
-                to: replaceTo,
-                insert: isChecked ? "x" : " "
-              }
-            });
-            return true;
-          }
+        const regex = /([-*+]\s)\[(x| |X)\]/i;
+        const match = line.text.match(regex);
+        if (match) {
+          const matchIndex = match.index;
+          const replaceFrom = line.from + matchIndex! + match[1].length + 1;
+          const replaceTo = replaceFrom + 1;
+          view.dispatch({
+            changes: {
+              from: replaceFrom,
+              to: replaceTo,
+              insert: isChecked ? "x" : " "
+            }
+          });
+          return true;
         }
       }
     }
   }
 });
 
-const checkboxes = ViewPlugin.fromClass(class {
-  checkboxes: DecorationSet;
-  constructor(view: EditorView) {
-    this.checkboxes = checkboxMatcher.createDeco(view);
+class ImageWidget extends WidgetType {
+  constructor(readonly url: string, readonly alt: string, readonly filePath: string) { super(); }
+  eq(other: ImageWidget) { return other.url === this.url && other.alt === this.alt && other.filePath === this.filePath; }
+  toDOM() {
+    const wrap = document.createElement("span");
+    const img = document.createElement("img");
+    
+    let absoluteUrl = this.url;
+    if (!this.url.startsWith('http') && !this.url.startsWith('data:') && !this.url.startsWith('tauri://') && this.filePath) {
+      const dir = this.filePath.substring(0, Math.max(this.filePath.lastIndexOf('/'), this.filePath.lastIndexOf('\\')));
+      const isAbsolute = this.url.startsWith('/') || this.url.match(/^[a-zA-Z]:\\/);
+      const resolvedPath = isAbsolute ? this.url : `${dir}/${this.url}`;
+      
+      try {
+        absoluteUrl = convertFileSrc(resolvedPath);
+      } catch (e) {
+        console.error("Failed to convert file src", e);
+      }
+    }
+    
+    img.src = absoluteUrl;
+    img.alt = this.alt;
+    img.className = "cm-image";
+    img.style.maxWidth = "100%";
+    img.style.maxHeight = "400px";
+    img.style.borderRadius = "4px";
+    img.style.display = "block";
+    img.style.margin = "8px 0";
+    wrap.appendChild(img);
+    return wrap;
   }
-  update(update: ViewUpdate) {
-    this.checkboxes = checkboxMatcher.updateDeco(update, this.checkboxes);
+}
+
+
+
+class HrWidget extends WidgetType {
+  toDOM() {
+    const hr = document.createElement("hr");
+    hr.className = "cm-hr";
+    return hr;
   }
-}, {
-  decorations: instance => instance.checkboxes,
-  provide: plugin => EditorView.atomicRanges.of(view => {
-    return view.plugin(plugin)?.checkboxes || Decoration.none;
-  })
-});
+}
+
+class TableWidget extends WidgetType {
+  constructor(readonly text: string) { super(); }
+  eq(other: TableWidget) { return other.text === this.text; }
+  toDOM() {
+    const wrap = document.createElement("div");
+    wrap.style.overflowX = "auto";
+    wrap.style.margin = "16px 0";
+    const table = document.createElement("table");
+    table.className = "cm-table";
+    
+    const lines = this.text.trim().split('\n');
+    let html = '';
+    lines.forEach((line, i) => {
+      if (i === 1 && line.match(/^[-|: ]+$/)) return;
+      const isHeader = i === 0;
+      const tag = isHeader ? 'th' : 'td';
+      const cells = line.replace(/^\||\|$/g, '').split('|');
+      const rowHtml = cells.map(c => {
+        return `<${tag}>${c.trim()}</${tag}>`;
+      }).join('');
+      html += `<tr>${rowHtml}</tr>`;
+    });
+    table.innerHTML = html;
+    wrap.appendChild(table);
+    return wrap;
+  }
+}
 
 const hideMarkDeco = Decoration.replace({});
+const codeBlockLineDeco = Decoration.line({
+  attributes: { class: "cm-codeblock-line" }
+});
+const bulletMarkDeco = Decoration.mark({ class: "cm-list-bullet" });
 
-const livePreviewPlugin = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
+import { EditorState, StateField } from '@codemirror/state';
 
-  constructor(view: EditorView) {
-    this.decorations = this.buildDeco(view);
-  }
+const buildDeco = (state: EditorState, filePath: string) => {
+  const marks: {from: number, to: number, type: string, widget?: WidgetType}[] = [];
+  const selection = state.selection.main;
+  const activeLine = state.doc.lineAt(selection.head);
 
-  update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged || update.selectionSet) {
-      this.decorations = this.buildDeco(update.view);
-    }
-  }
-
-  buildDeco(view: EditorView) {
-    const marks: {from: number, to: number}[] = [];
-    const selection = view.state.selection.main;
-    const activeLine = view.state.doc.lineAt(selection.head);
-
-    for (let { from, to } of view.visibleRanges) {
-      syntaxTree(view.state).iterate({
-        from,
-        to,
-        enter: (node) => {
-          const isActiveLine = node.from >= activeLine.from && node.from <= activeLine.to;
-          if (isActiveLine) return;
-
-          const name = node.name;
-          if (
-            name === "HeaderMark" ||
-            name === "EmphasisMark" ||
-            name === "CodeMark" ||
-            name === "QuoteMark"
-          ) {
-            marks.push({from: node.from, to: node.to});
+  syntaxTree(state).iterate({
+    enter: (node) => {
+      const isActiveLine = node.from >= activeLine.from && node.from <= activeLine.to;
+      const name = node.name;
+      
+      if (name === "Image") {
+        if (!isActiveLine) {
+          const text = state.doc.sliceString(node.from, node.to);
+          const match = text.match(/!\[(.*?)\]\((.*?)\)/);
+          if (match) {
+            marks.push({from: node.from, to: node.to, type: "replace", widget: new ImageWidget(match[2], match[1], filePath)});
           }
         }
-      });
-    }
+        return false;
+      } else if (name === "HorizontalRule") {
+        if (!isActiveLine) {
+          const startLine = state.doc.lineAt(node.from);
+          marks.push({from: startLine.from, to: startLine.to, type: "replace-block", widget: new HrWidget()});
+        }
+        return false;
+      } else if (name === "Table") {
+        if (!isActiveLine) {
+          const text = state.doc.sliceString(node.from, node.to);
+          const startLine = state.doc.lineAt(node.from);
+          const endLine = state.doc.lineAt(node.to);
+          marks.push({from: startLine.from, to: endLine.to, type: "replace-block", widget: new TableWidget(text)});
+        }
+        return false;
+      } else if (name === "FencedCode") {
+        let pos = node.from;
+        while (pos <= node.to) {
+          const line = state.doc.lineAt(pos);
+          marks.push({from: line.from, to: line.from, type: "line"});
+          pos = line.to + 1;
+        }
+      } else if (name === "TaskMarker") {
+        if (!isActiveLine) {
+          const text = state.doc.sliceString(node.from, node.to);
+          const isChecked = text.toLowerCase() === "[x]" || text.toLowerCase() === "[X]";
+          
+          const line = state.doc.lineAt(node.from);
+          let listMarkFrom = -1;
+          syntaxTree(state).iterate({
+            from: line.from,
+            to: node.from,
+            enter: (n) => {
+              if (n.name === "ListMark") listMarkFrom = n.from;
+            }
+          });
 
-    marks.sort((a, b) => a.from - b.from || a.to - b.to);
-    
-    const builder = new RangeSetBuilder<Decoration>();
-    let lastTo = -1;
-    for (const {from, to} of marks) {
-      if (from >= lastTo) {
-        builder.add(from, to, hideMarkDeco);
-        lastTo = to;
+          if (listMarkFrom !== -1) {
+            marks.push({from: listMarkFrom, to: node.to, type: "replace", widget: new CheckboxWidget(isChecked)});
+          }
+        }
+      } else if (name === "ListMark") {
+        if (!isActiveLine) {
+          const line = state.doc.lineAt(node.from);
+          let hasTask = false;
+          syntaxTree(state).iterate({
+            from: node.to,
+            to: line.to,
+            enter: (n) => {
+              if (n.name === "TaskMarker") hasTask = true;
+            }
+          });
+
+          if (!hasTask) {
+            const text = state.doc.sliceString(node.from, node.to);
+            if (/^[-*+]\s*$/.test(text)) {
+              marks.push({from: node.from, to: node.to, type: "mark-bullet"});
+            }
+          }
+        }
+      }
+
+      if (isActiveLine) return;
+
+      if (
+        name === "HeaderMark" ||
+        name === "EmphasisMark" ||
+        name === "CodeMark" ||
+        name === "QuoteMark" ||
+        name === "LinkMark" ||
+        name === "URL"
+      ) {
+        marks.push({from: node.from, to: node.to, type: "hide"});
       }
     }
-    return builder.finish();
+  });
+
+  marks.sort((a, b) => {
+    if (a.from !== b.from) return a.from - b.from;
+    const isLineA = a.type.startsWith("line");
+    const isLineB = b.type.startsWith("line");
+    if (isLineA && !isLineB) return -1;
+    if (!isLineA && isLineB) return 1;
+    return a.to - b.to;
+  });
+  
+  const builder = new RangeSetBuilder<Decoration>();
+  let lastTo = -1;
+  for (const mark of marks) {
+    if (mark.type === "line") {
+      builder.add(mark.from, mark.from, codeBlockLineDeco);
+    } else if (mark.from >= lastTo) {
+      if (mark.type === "hide") {
+        builder.add(mark.from, mark.to, hideMarkDeco);
+      } else if (mark.type === "mark-bullet") {
+        builder.add(mark.from, mark.to, bulletMarkDeco);
+      } else if (mark.type === "replace" && mark.widget) {
+        builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget }));
+      } else if (mark.type === "replace-block" && mark.widget) {
+        builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget, block: true }));
+      }
+      lastTo = mark.to;
+    }
   }
-}, {
-  decorations: v => v.decorations
+  return builder.finish();
+};
+
+const getLivePreviewField = (filePath: string) => StateField.define<DecorationSet>({
+  create(state) {
+    return buildDeco(state, filePath);
+  },
+  update(deco, tr) {
+    if (tr.docChanged || tr.selection) {
+      return buildDeco(tr.state, filePath);
+    }
+    return deco;
+  },
+  provide: f => EditorView.decorations.from(f)
 });
+
 
 
 // A custom theme to make CodeMirror blend in with our Obsidian-like UI
@@ -159,6 +301,10 @@ const gladeTheme = EditorView.theme({
     padding: "40px",
     maxWidth: "800px",
     margin: "0 auto",
+  },
+  ".cm-scroller": {
+    fontFamily: "var(--font-text)",
+    scrollbarGutter: "stable",
   },
   "&.cm-focused .cm-cursor": {
     borderLeftColor: "var(--text-normal)",
@@ -182,7 +328,7 @@ const gladeTheme = EditorView.theme({
   ".cm-line": {
     padding: "0",
   }
-}, { dark: true });
+}, { dark: false });
 
 // Markdown specific syntax highlighting to make it look like a rich document
 const markdownHighlighting = HighlightStyle.define([
@@ -204,8 +350,10 @@ const markdownHighlighting = HighlightStyle.define([
 ]);
 
 
-const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName }) => {
+export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName, filePath }) => {
   const [content, setContent] = useState(initialContent);
+
+  const livePreviewField = React.useMemo(() => getLivePreviewField(filePath), [filePath]);
 
   // When initialContent changes (e.g., file switched), update local state
   useEffect(() => {
@@ -222,7 +370,9 @@ const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName }) => 
   return (
     <div className="editor-wrapper">
       <div className="editor-header">
-        <span className="file-name">{fileName}</span>
+        <div className="editor-header-inner">
+          <span className="file-name">{fileName}</span>
+        </div>
       </div>
       <div className="editor-scroll-area">
         <CodeMirror
@@ -233,9 +383,8 @@ const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName }) => 
             markdown({ base: markdownLanguage, codeLanguages: languages }),
             gladeTheme,
             syntaxHighlighting(markdownHighlighting),
-            checkboxes,
             checkboxInteraction,
-            livePreviewPlugin,
+            livePreviewField,
             EditorView.lineWrapping
           ]}
           onChange={handleChange}
