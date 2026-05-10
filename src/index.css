@@ -51,15 +51,15 @@ html, body, #root {
 }
 
 .backlinks-card {
-  margin: 2rem;
+  max-width: calc(800px - 3rem); /* match editor text width, adjusting for internal padding */
+  width: 100%;
+  margin: 0 auto 40px auto;
   padding: 1.5rem;
   border-radius: 8px;
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
   font-family: var(--font-text);
-  overflow-y: auto;
-  max-height: 30vh;
 }
 
 .backlinks-card h3 {

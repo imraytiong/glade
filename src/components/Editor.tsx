@@ -872,7 +872,7 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
         <CodeMirror
           className="cm-outer-wrapper"
           value={content}
-          height="100%"
+          height="auto"
           extensions={[
             markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
             gladeTheme,
