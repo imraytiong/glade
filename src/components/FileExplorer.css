@@ -48,4 +48,34 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-grow: 1;
+}
+
+.node-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+}
+
+.folder-header:hover .node-actions,
+.file-node:hover .node-actions {
+  opacity: 1;
+}
+
+.action-icon {
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.action-icon:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.drag-over {
+  background-color: var(--background-modifier-active) !important;
+  border: 1px dashed var(--text-muted);
 }

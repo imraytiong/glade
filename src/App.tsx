@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile, rename } from '@tauri-apps/plugin-fs';
-import { FolderOpen, Settings } from 'lucide-react';
+import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
+import { FolderOpen, Settings, FilePlus, FolderPlus } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
@@ -13,6 +13,7 @@ import StatusBar from './components/StatusBar';
 import CommandPalette from './components/CommandPalette';
 import BacklinksPane from './components/BacklinksPane';
 import SettingsDialog from './components/SettingsDialog';
+import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import './App.css';
 
 function App() {
@@ -317,12 +318,121 @@ function App() {
     setIsCommandPaletteOpen(false);
   };
 
-  const handleRenameFile = async (oldPath: string, newName: string) => {
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+
+  const executeDelete = async (path: string) => {
+    try {
+      await remove(path, { recursive: true });
+      const updatedOpenFiles = openFiles.filter(f => !f.path.startsWith(path));
+      setOpenFiles(updatedOpenFiles);
+      if (activeFileContent?.path.startsWith(path)) {
+        if (updatedOpenFiles.length > 0) {
+          handleOpenFile(updatedOpenFiles[updatedOpenFiles.length - 1]);
+        } else {
+          setActiveFileContent(null);
+        }
+      }
+      loadVaultFiles(vaultPath!);
+    } catch (err) {
+      console.error("Failed to delete", err);
+      showToast("Failed to delete file/folder");
+    }
+  };
+
+  const requestDelete = (path: string) => {
+    const skipConfirm = localStorage.getItem('glade_skipDeleteConfirm') === 'true';
+    if (skipConfirm) {
+      executeDelete(path);
+    } else {
+      setFileToDelete(path);
+    }
+  };
+
+  const handleConfirmDelete = (dontShowAgain: boolean) => {
+    if (dontShowAgain) {
+      localStorage.setItem('glade_skipDeleteConfirm', 'true');
+    }
+    if (fileToDelete) {
+      executeDelete(fileToDelete);
+    }
+    setFileToDelete(null);
+  };
+
+  const handleSidebarCreateFile = async (folderPath: string) => {
     if (!vaultPath) return;
-    const isExtension = newName.endsWith('.md');
-    const finalName = isExtension ? newName : newName + '.md';
+    try {
+      let newFilePath = `${folderPath}/Untitled.md`;
+      let counter = 1;
+      try {
+        await readTextFile(newFilePath);
+        while (true) {
+          newFilePath = `${folderPath}/Untitled-${counter}.md`;
+          try {
+            await readTextFile(newFilePath);
+            counter++;
+          } catch {
+            break;
+          }
+        }
+      } catch {
+        // file doesn't exist
+      }
+      await writeTextFile(newFilePath, "");
+      loadVaultFiles(vaultPath);
+      handleOpenFile({ name: newFilePath.split(/[/\\]/).pop()!, path: newFilePath, isDirectory: false });
+    } catch (err) {
+      console.error("Failed to create file", err);
+      showToast("Failed to create file");
+    }
+  };
+
+  const handleSidebarCreateFolder = async (folderPath: string) => {
+    if (!vaultPath) return;
+    try {
+      const newFolderPath = `${folderPath}/New Folder`;
+      await mkdir(newFolderPath);
+      loadVaultFiles(vaultPath);
+    } catch (err) {
+      console.error("Failed to create folder", err);
+      showToast("Failed to create folder");
+    }
+  };
+
+  const handleMoveFile = async (oldPath: string, newFolderPath: string) => {
+    const fileName = oldPath.split('/').pop() || oldPath.split('\\').pop() || '';
+    const newPath = `${newFolderPath}/${fileName}`;
+    if (oldPath === newPath) return;
+    
+    try {
+      await rename(oldPath, newPath);
+      await globalIndexer.globalRename(oldPath, newPath);
+      
+      const updatedOpenFiles = openFiles.map(f => f.path === oldPath ? { ...f, path: newPath } : f);
+      setOpenFiles(updatedOpenFiles);
+      if (activeFileContent?.path === oldPath) {
+        setActiveFileContent({ ...activeFileContent, path: newPath });
+      }
+      
+      loadVaultFiles(vaultPath!);
+    } catch (err) {
+      console.error("Failed to move file", err);
+      showToast("Failed to move file");
+    }
+  };
+
+  const handleRenameFile = async (oldPath: string, newName: string, isDirectory?: boolean) => {
+    if (!vaultPath) return;
+    
+    let finalName = newName;
+    if (!isDirectory) {
+      const isExtension = newName.endsWith('.md');
+      finalName = isExtension ? newName : newName + '.md';
+    }
+    
     const oldDir = oldPath.substring(0, Math.max(oldPath.lastIndexOf('/'), oldPath.lastIndexOf('\\')));
     const newPath = `${oldDir}/${finalName}`;
+
+    if (oldPath === newPath) return;
 
     try {
       await rename(oldPath, newPath);
@@ -352,6 +462,42 @@ function App() {
     }
   };
 
+  const handleDuplicateFile = async (path: string, isDirectory: boolean) => {
+    if (!vaultPath) return;
+    if (isDirectory) {
+      showToast("Duplicating folders is not currently supported");
+      return;
+    }
+    
+    try {
+      // Find a unique name
+      const dir = path.substring(0, Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')));
+      let fileName = path.split(/[/\\]/).pop() || 'Untitled';
+      const ext = fileName.endsWith('.md') ? '.md' : '';
+      const baseName = fileName.replace(/\.md$/, '');
+      
+      let newFilePath = `${dir}/${baseName} copy${ext}`;
+      let counter = 1;
+      
+      while (true) {
+        try {
+          await readTextFile(newFilePath);
+          newFilePath = `${dir}/${baseName} copy ${counter}${ext}`;
+          counter++;
+        } catch {
+          // File doesn't exist, we can use this path
+          break;
+        }
+      }
+      
+      await copyFile(path, newFilePath);
+      loadVaultFiles(vaultPath);
+    } catch (err) {
+      console.error("Failed to duplicate file", err);
+      showToast("Failed to duplicate file");
+    }
+  };
+
   return (
     <div className={`app-container ${isZenMode ? 'zen-mode' : ''}`}>
       {toast && (
@@ -365,19 +511,36 @@ function App() {
         </div>
       )}
       {isSidebarOpen && !isZenMode && (
-        <div className="sidebar">
-          <div className="sidebar-header">
+        <div className="sidebar" style={{ position: 'relative' }}>
+          <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="sidebar-title">Glade</span>
           </div>
         
         <div className="sidebar-content">
           {vaultPath ? (
-            <FileExplorer 
-              nodes={fileTree} 
-              activeFilePath={activeFile?.path || null} 
-              onFileSelect={handleOpenFile} 
-              onRename={handleRenameFile}
-            />
+            <>
+              <FileExplorer 
+                nodes={fileTree} 
+                activeFilePath={activeFile?.path || null} 
+                onFileSelect={handleOpenFile} 
+                onRename={handleRenameFile}
+                onDelete={requestDelete}
+                onCreateFile={handleSidebarCreateFile}
+                onCreateFolder={handleSidebarCreateFolder}
+                onMove={handleMoveFile}
+                onDuplicate={handleDuplicateFile}
+              />
+              <div className="empty-space-actions">
+                <div className="empty-actions-container">
+                  <button className="icon-btn" onClick={() => handleSidebarCreateFile(vaultPath)} title="New File in Vault" style={{ padding: '4px' }}>
+                    <FilePlus size={14} />
+                  </button>
+                  <button className="icon-btn" onClick={() => handleSidebarCreateFolder(vaultPath)} title="New Folder in Vault" style={{ padding: '4px' }}>
+                    <FolderPlus size={14} />
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>
               No vault opened.
@@ -385,7 +548,7 @@ function App() {
           )}
         </div>
         
-        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '12px 16px', gap: '8px' }}>
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '6px 16px', gap: '8px' }}>
           <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FolderOpen size={16} />
           </button>
@@ -476,6 +639,13 @@ function App() {
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
       />
+      {fileToDelete && (
+        <ConfirmDeleteModal
+          fileName={fileToDelete.split(/[/\\]/).pop() || fileToDelete}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setFileToDelete(null)}
+        />
+      )}
     </div>
   );
 }

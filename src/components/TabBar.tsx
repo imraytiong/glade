@@ -53,7 +53,7 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
     }
   };
 
-  const submitEdit = (index: number, oldPath: string) => {
+  const submitEdit = (oldPath: string) => {
     setEditingIndex(null);
     if (editName && onRename) {
       onRename(oldPath, editName);
@@ -82,7 +82,7 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
         <div
           key={`${file.path}-${index}`}
           className={`tab ${index === activeFileIndex ? 'active' : ''}`}
-          onClick={(e) => {
+          onClick={() => {
             if (editingIndex !== index) {
                onTabClick(index);
             }
@@ -101,7 +101,7 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
                 autoFocus
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                onBlur={() => submitEdit(index, file.path)}
+                onBlur={() => submitEdit(file.path)}
                 onKeyDown={e => {
                   if (e.key === 'Enter') e.currentTarget.blur();
                   if (e.key === 'Escape') {
