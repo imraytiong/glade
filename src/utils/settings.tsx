@@ -3,12 +3,14 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 export interface Settings {
   wordWrap: boolean;
   lineNumbers: boolean;
+  showBacklinks: boolean;
   hotkeys: Record<string, string>;
 }
 
 export const defaultSettings: Settings = {
   wordWrap: true,
   lineNumbers: false,
+  showBacklinks: true,
   hotkeys: {
     "file.search": "Cmd+F",
     "command.palette": "Cmd+P",

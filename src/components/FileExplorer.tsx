@@ -7,6 +7,7 @@ interface FileExplorerProps {
   nodes: FileNode[];
   activeFilePath: string | null;
   onFileSelect: (file: FileNode) => void;
+  onRename?: (oldPath: string, newName: string) => void;
   level?: number;
 }
 
@@ -14,12 +15,30 @@ const FileExplorerNode: React.FC<{
   node: FileNode;
   activeFilePath: string | null;
   onFileSelect: (file: FileNode) => void;
+  onRename?: (oldPath: string, newName: string) => void;
   level: number;
-}> = ({ node, activeFilePath, onFileSelect, level }) => {
+}> = ({ node, activeFilePath, onFileSelect, onRename, level }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(node.name);
 
   const paddingLeft = `${level * 16 + 12}px`;
   const isActive = activeFilePath === node.path;
+
+  const handleRenameSubmit = () => {
+    if (editName && editName !== node.name && onRename) {
+      onRename(node.path, editName);
+    }
+    setIsEditing(false);
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleRenameSubmit();
+    if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditName(node.name);
+    }
+  };
 
   if (node.isDirectory) {
     return (
@@ -43,6 +62,7 @@ const FileExplorerNode: React.FC<{
                 node={child}
                 activeFilePath={activeFilePath}
                 onFileSelect={onFileSelect}
+                onRename={onRename}
                 level={level + 1}
               />
             ))}
@@ -56,15 +76,39 @@ const FileExplorerNode: React.FC<{
     <div 
       className={`file-node ${isActive ? 'active' : ''}`}
       style={{ paddingLeft }}
-      onClick={() => onFileSelect(node)}
+      onClick={() => !isEditing && onFileSelect(node)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setIsEditing(true);
+        setEditName(node.name);
+      }}
+      draggable={!isEditing}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/glade-file', JSON.stringify({ name: node.name, path: node.path }));
+        e.dataTransfer.effectAllowed = 'copyLink';
+      }}
     >
       <FileText size={14} className="file-icon" />
-      <span className="node-name">{node.name.replace(/\.md$/, '')}</span>
+      {isEditing ? (
+        <input 
+          type="text" 
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onBlur={handleRenameSubmit}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className="node-rename-input"
+          style={{ width: '100%', background: 'var(--bg-modifier-hover)', border: '1px solid var(--border)', color: 'var(--text-primary)', outline: 'none' }}
+          onClick={e => e.stopPropagation()}
+        />
+      ) : (
+        <span className="node-name">{node.name.replace(/\.md$/, '')}</span>
+      )}
     </div>
   );
 };
 
-const FileExplorer: React.FC<FileExplorerProps> = ({ nodes, activeFilePath, onFileSelect, level = 0 }) => {
+const FileExplorer: React.FC<FileExplorerProps> = ({ nodes, activeFilePath, onFileSelect, onRename, level = 0 }) => {
   return (
     <div className="file-explorer">
       {nodes.map(node => (
@@ -73,6 +117,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ nodes, activeFilePath, onFi
           node={node}
           activeFilePath={activeFilePath}
           onFileSelect={onFileSelect}
+          onRename={onRename}
           level={level}
         />
       ))}

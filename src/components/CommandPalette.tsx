@@ -6,7 +6,7 @@ import './CommandPalette.css';
 
 interface CommandPaletteProps {
   isOpen: boolean;
-  initialMode: 'files' | 'commands';
+  initialMode: 'files' | 'commands' | 'link';
   onClose: () => void;
   files: FileNode[];
   commands: Command[];
@@ -33,7 +33,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
   hotkeys
 }) => {
   const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<'files' | 'commands'>(initialMode);
+  const [mode, setMode] = useState<'files' | 'commands' | 'link'>(initialMode);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +56,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
     activeQuery = query.substring(1).trimStart();
   }
 
-  const filteredFiles = activeMode === 'files' 
+  const filteredFiles = (activeMode === 'files' || activeMode === 'link')
     ? files.filter(f => f.name.toLowerCase().includes(activeQuery.toLowerCase()))
     : [];
 
@@ -64,7 +64,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
     ? commands.filter(c => c.name.toLowerCase().includes(activeQuery.toLowerCase()))
     : [];
 
-  const itemCount = activeMode === 'files' ? filteredFiles.length : filteredCommands.length;
+  const itemCount = (activeMode === 'files' || activeMode === 'link') ? filteredFiles.length : filteredCommands.length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -77,7 +77,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
       setSelectedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeMode === 'files' && filteredFiles[selectedIndex]) {
+      if ((activeMode === 'files' || activeMode === 'link') && filteredFiles[selectedIndex]) {
         onFileSelect(filteredFiles[selectedIndex]);
         onClose();
       } else if (activeMode === 'commands' && filteredCommands[selectedIndex]) {
@@ -121,7 +121,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           <input 
             ref={inputRef}
             type="text" 
-            placeholder={activeMode === 'commands' ? "Type a command..." : "Search files by name... (Type > for commands)"}
+            placeholder={activeMode === 'commands' ? "Type a command..." : activeMode === 'link' ? "Search files to link..." : "Search files by name... (Type > for commands)"}
             value={displayQuery}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -131,7 +131,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
           />
         </div>
         <div className="palette-results">
-          {activeMode === 'files' && (
+          {(activeMode === 'files' || activeMode === 'link') && (
             filteredFiles.length > 0 ? (
               filteredFiles.map((file, index) => (
                 <div 

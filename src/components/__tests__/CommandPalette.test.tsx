@@ -1,5 +1,4 @@
-import React from 'react';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { expect, test, describe, vi } from 'vitest';
 import CommandPalette from '../CommandPalette';
 import { FileNode } from '../../utils/fs';

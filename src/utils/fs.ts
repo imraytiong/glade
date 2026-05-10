@@ -28,12 +28,16 @@ export async function readVaultRecursive(dirPath: string): Promise<FileNode[]> {
           isDirectory: true,
           children: children.sort((a, b) => a.name.localeCompare(b.name))
         });
-      } else if (entry.isFile && entry.name?.endsWith('.md')) {
-        nodes.push({
-          name: entry.name,
-          path: nodePath,
-          isDirectory: false
-        });
+      } else if (entry.isFile) {
+        const isMarkdown = entry.name?.endsWith('.md');
+        const isImage = entry.name?.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
+        if (isMarkdown || isImage) {
+          nodes.push({
+            name: entry.name,
+            path: nodePath,
+            isDirectory: false
+          });
+        }
       }
     }
 

@@ -5,7 +5,7 @@
 ##### Heading 5
 ###### Heading 6
 
-This is a paragraph with **bold text**, *italic text*, and ***bold italic text***. We also support `inline code` snippets and ~~strikethrough~~ (if enabled).
+This is a [paragraph](/Users/raytiong/projects/glade/test-vault/core/memory/vector-stores/pinecone/evaluating-llms.md) with **bold text**, *italic text*, and ***bold italic text***. We also support `inline code` snippets and ~~strikethrough~~ (if enabled).
 
 You can also use alternate syntax like __bold__ and _italic_.
 

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { markdown, markdownLanguage, insertNewlineContinueMarkup, deleteMarkupBackward } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { EditorView } from '@codemirror/view';
+import { EditorView, ViewUpdate, keymap } from '@codemirror/view';
+import { autocompletion, CompletionContext, CompletionResult, closeBrackets } from '@codemirror/autocomplete';
+import { format, addDays, subDays } from 'date-fns';
 import './Editor.css';
 
+import { hoverTooltip } from '@codemirror/view';
+import { readTextFile } from '@tauri-apps/plugin-fs';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface EditorProps {
@@ -12,6 +16,11 @@ interface EditorProps {
   onSave: (content: string) => void;
   fileName: string;
   filePath: string;
+  initialCursorPos?: number;
+  onCursorChange?: (pos: number) => void;
+  allFiles?: { name: string, path: string }[];
+  onNavigate?: (filePath: string) => void;
+  onCreateFile?: (fileName: string) => void;
 }
 
 import { useSettings } from '../utils/settings';
@@ -82,6 +91,73 @@ const checkboxInteraction = EditorView.domEventHandlers({
   }
 });
 
+const pasteHandler = EditorView.domEventHandlers({
+  paste(event, view) {
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return false;
+    
+    const text = clipboardData.getData('text/plain');
+    if (!text) return false;
+
+    try {
+      new URL(text);
+    } catch {
+      return false; // Not a URL
+    }
+
+    const selection = view.state.selection.main;
+    if (selection.empty) return false; // Nothing selected
+
+    const selectedText = view.state.doc.sliceString(selection.from, selection.to);
+    
+    event.preventDefault();
+    view.dispatch({
+      changes: {
+        from: selection.from,
+        to: selection.to,
+        insert: `[${selectedText}](${text})`
+      },
+      selection: { anchor: selection.from + selectedText.length + text.length + 4 }
+    });
+    return true;
+  }
+});
+
+const dropHandler = EditorView.domEventHandlers({
+  drop: (e, view) => {
+    const data = e.dataTransfer?.getData('application/glade-file');
+    if (data) {
+      e.preventDefault();
+      try {
+        const file = JSON.parse(data);
+        const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+        if (pos !== null) {
+          const isImage = file.name.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i);
+          const linkText = isImage ? `![${file.name}](${file.path})` : `[${file.name.replace(/\.md$/, '')}](${file.path})`;
+          view.dispatch({
+            changes: { from: pos, insert: linkText },
+            selection: { anchor: pos + linkText.length }
+          });
+          view.focus();
+        }
+      } catch (err) {
+        console.error("Failed to parse dropped file", err);
+      }
+      return true;
+    }
+    return false;
+  }
+});
+
+const typewriterScroll = EditorState.transactionExtender.of((tr) => {
+  if (tr.docChanged && tr.selection) {
+    return {
+      effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: 'center' })
+    };
+  }
+  return null;
+});
+
 class ImageWidget extends WidgetType {
   constructor(readonly url: string, readonly alt: string, readonly filePath: string) { super(); }
   eq(other: ImageWidget) { return other.url === this.url && other.alt === this.alt && other.filePath === this.filePath; }
@@ -129,13 +205,6 @@ class ImageWidget extends WidgetType {
     img.style.margin = "8px 0";
     wrap.appendChild(img);
     
-    // DEBUG: Show the absoluteUrl text next to the image
-    const debugText = document.createElement("div");
-    debugText.textContent = "DEBUG URL: " + absoluteUrl;
-    debugText.style.color = "red";
-    debugText.style.fontSize = "12px";
-    wrap.appendChild(debugText);
-    
     return wrap;
   }
 }
@@ -182,10 +251,11 @@ const hideMarkDeco = Decoration.replace({});
 const codeBlockLineDeco = Decoration.line({
   attributes: { class: "cm-codeblock-line" }
 });
+const danglingLinkDeco = Decoration.mark({ class: "cm-link-dangling" });
 
 import { EditorState, StateField } from '@codemirror/state';
 
-const buildDeco = (state: EditorState, filePath: string) => {
+const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>) => {
   const marks: {from: number, to: number, type: string, widget?: WidgetType}[] = [];
   const selection = state.selection.main;
   const activeLine = state.doc.lineAt(selection.head);
@@ -281,6 +351,30 @@ const buildDeco = (state: EditorState, filePath: string) => {
         (name === "URL" && node.node.parent?.name === "Link")
       ) {
         marks.push({from: node.from, to: node.to, type: "hide"});
+      } else if (name === "Link") {
+        const text = state.doc.sliceString(node.from, node.to);
+        const match = text.match(/\[(.*?)\]\((.*?)\)/);
+        if (match) {
+          let linkTarget = match[2].split('#')[0]; // Strip hash
+          // check if dangling
+          if (linkTarget && !linkTarget.startsWith('http') && !linkTarget.startsWith('data:') && !linkTarget.startsWith('tauri://')) {
+            let absPath = linkTarget;
+            if (!absPath.startsWith('/')) {
+                const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
+                const parts = `${dir}/${absPath}`.split(/[/\\]/);
+                const res: string[] = [];
+                for (const p of parts) {
+                    if (p === '.' || p === '') continue;
+                    if (p === '..') { if(res.length && res[res.length-1] !== '..') res.pop(); else res.push('..'); }
+                    else res.push(p);
+                }
+                absPath = '/' + res.join('/');
+            }
+            if (!validPaths.has(absPath)) {
+               marks.push({from: node.from, to: node.to, type: "mark-dangling"});
+            }
+          }
+        }
       }
     }
   });
@@ -306,6 +400,8 @@ const buildDeco = (state: EditorState, filePath: string) => {
         builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget }));
       } else if (mark.type === "replace-block" && mark.widget) {
         builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget, block: true }));
+      } else if (mark.type === "mark-dangling") {
+        builder.add(mark.from, mark.to, danglingLinkDeco);
       }
       lastTo = mark.to;
     }
@@ -313,13 +409,110 @@ const buildDeco = (state: EditorState, filePath: string) => {
   return builder.finish();
 };
 
-const getLivePreviewField = (filePath: string) => StateField.define<DecorationSet>({
+const getLinkHoverTooltip = (filePath: string, validPaths: Set<string>) => hoverTooltip(async (view, pos) => {
+  const tree = syntaxTree(view.state);
+  let isLink = false;
+  let linkUrl = "";
+  let tooltipFrom = pos, tooltipTo = pos;
+
+  tree.iterate({
+    from: pos, to: pos,
+    enter: (node) => {
+      if (node.name === "Link" || node.name === "URL") {
+        let n: any = node.node;
+        if (n.name === "URL") {
+          n = n.parent;
+        }
+        if (n?.name === "Link") {
+          const urlNode = n.getChild("URL");
+          if (urlNode && urlNode.from <= pos && urlNode.to >= pos) {
+              const doc = view.state.doc.sliceString(n.from, n.to);
+              const match = doc.match(/\[(.*?)\]\((.*?)\)/);
+              if (match) {
+                 linkUrl = match[2];
+                 isLink = true;
+                 tooltipFrom = urlNode.from;
+                 tooltipTo = urlNode.to;
+              }
+          }
+        }
+      }
+    }
+  });
+
+  if (!isLink || !linkUrl) return null;
+
+  let linkTarget = linkUrl.split('#')[0];
+  let isExternal = linkTarget.startsWith('http') || linkTarget.startsWith('data:') || linkTarget.startsWith('tauri://');
+
+  let absPath = linkTarget;
+  if (!isExternal) {
+    if (!absPath.startsWith('/')) {
+        const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
+        const parts = `${dir}/${absPath}`.split(/[/\\]/);
+        const res: string[] = [];
+        for (const p of parts) {
+            if (p === '.' || p === '') continue;
+            if (p === '..') { if(res.length && res[res.length-1] !== '..') res.pop(); else res.push('..'); }
+            else res.push(p);
+        }
+        absPath = '/' + res.join('/');
+    }
+  }
+
+  return {
+    pos: tooltipFrom,
+    end: tooltipTo,
+    above: true,
+    create() {
+      const dom = document.createElement("div");
+      dom.className = "cm-link-preview-tooltip";
+      dom.style.padding = "10px";
+      dom.style.maxWidth = "400px";
+      dom.style.maxHeight = "300px";
+      dom.style.overflow = "hidden";
+      dom.style.backgroundColor = "var(--background-secondary)";
+      dom.style.border = "1px solid var(--background-modifier-border)";
+      dom.style.borderRadius = "8px";
+      dom.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+      dom.style.color = "var(--text-normal)";
+      dom.style.fontSize = "14px";
+      dom.style.whiteSpace = "pre-wrap";
+
+      if (isExternal) {
+         const link = document.createElement("a");
+         link.href = linkTarget;
+         link.target = "_blank";
+         link.style.color = "var(--text-accent)";
+         link.textContent = linkTarget;
+         dom.innerHTML = `<strong style="display:block;margin-bottom:8px;">External Link</strong>`;
+         dom.appendChild(link);
+      } else {
+         if (validPaths.has(absPath)) {
+            dom.textContent = "Loading preview...";
+            readTextFile(absPath).then(content => {
+               const preview = content.length > 500 ? content.substring(0, 500) + '...' : content;
+               dom.innerHTML = `<strong style="display:block;margin-bottom:8px;">${absPath.split('/').pop()}</strong><div style="color: var(--text-muted); font-size: 13px;">${preview}</div>`;
+            }).catch(() => {
+               dom.textContent = "Error loading preview.";
+            });
+         } else {
+            dom.textContent = "File not found.";
+         }
+      }
+      
+      return { dom };
+    }
+  };
+});
+
+const getLivePreviewField = (filePath: string, validPaths: Set<string>) => StateField.define<DecorationSet>({
   create(state) {
-    return buildDeco(state, filePath);
+    return buildDeco(state, filePath, validPaths);
   },
   update(deco, tr) {
     if (tr.docChanged || tr.selection) {
-      return buildDeco(tr.state, filePath);
+      return buildDeco(tr.state, filePath, validPaths);
     }
     return deco;
   },
@@ -368,6 +561,10 @@ const gladeTheme = EditorView.theme({
   },
   ".cm-line": {
     padding: "0",
+  },
+  ".cm-link-dangling": {
+    color: "var(--text-faint)",
+    opacity: "0.8",
   }
 }, { dark: false });
 
@@ -391,22 +588,245 @@ const markdownHighlighting = HighlightStyle.define([
 ]);
 
 
-export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName, filePath }) => {
+export interface EditorHandle {
+  insertLink: (file: { name: string, path: string }) => void;
+  scrollToHeader: (hash: string) => void;
+}
+
+export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialContent, onSave, fileName, filePath, initialCursorPos, onCursorChange, allFiles, onNavigate, onCreateFile }, ref) => {
   const { settings } = useSettings();
   const [content, setContent] = useState(initialContent);
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
 
-  const livePreviewField = React.useMemo(() => getLivePreviewField(filePath), [filePath]);
+  const scrollToHeader = React.useCallback((hash: string) => {
+    if (!editorView) return;
+    const targetHash = hash.replace(/^#/, '').toLowerCase();
+    const doc = editorView.state.doc.toString();
+    const regex = /^(#{1,6})\s+(.*)$/gm;
+    let match;
+    while ((match = regex.exec(doc)) !== null) {
+       const headingText = match[2];
+       const headingId = headingText.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '');
+       if (headingId === targetHash || headingText.toLowerCase() === targetHash) {
+          editorView.dispatch({
+             selection: { anchor: match.index },
+             scrollIntoView: true
+          });
+          editorView.focus();
+          break;
+       }
+    }
+  }, [editorView]);
+
+  React.useImperativeHandle(ref, () => ({
+    insertLink: (file: { name: string, path: string }) => {
+      if (!editorView) return;
+      const selection = editorView.state.selection.main;
+      let selectedText = editorView.state.doc.sliceString(selection.from, selection.to);
+      if (!selectedText) selectedText = file.name.replace(/\.md$/, '');
+      const linkText = `[${selectedText}](${file.path})`;
+      
+      editorView.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: linkText },
+        selection: { anchor: selection.from + linkText.length }
+      });
+      editorView.focus();
+    },
+    scrollToHeader
+  }));
+
+
+  const { livePreviewField, linkHoverTooltip } = React.useMemo(() => {
+    const validPaths = new Set((allFiles || []).map(f => f.path));
+    return {
+      livePreviewField: getLivePreviewField(filePath, validPaths),
+      linkHoverTooltip: getLinkHoverTooltip(filePath, validPaths)
+    };
+  }, [filePath, allFiles]);
+
+  const linkClickHandler = React.useMemo(() => {
+    return EditorView.domEventHandlers({
+      mousedown(event, view) {
+        if (event.metaKey || event.ctrlKey) {
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          if (pos !== null) {
+            const line = view.state.doc.lineAt(pos);
+            const text = line.text;
+            const offset = pos - line.from;
+
+            let linkUrl: string | null = null;
+            let isLocal = false;
+
+            // Check for standard markdown link [text](url)
+            const mdLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+            let match;
+            while ((match = mdLinkRegex.exec(text)) !== null) {
+              if (offset >= match.index && offset <= match.index + match[0].length) {
+                linkUrl = match[2];
+                isLocal = !linkUrl.match(/^(http|https|mailto):/i);
+                break;
+              }
+            }
+
+            // Check for wiki link [[url]]
+            if (!linkUrl) {
+              const wikiLinkRegex = /\[\[([^\]]+)\]\]/g;
+              while ((match = wikiLinkRegex.exec(text)) !== null) {
+                if (offset >= match.index && offset <= match.index + match[0].length) {
+                  linkUrl = match[1];
+                  isLocal = true;
+                  break;
+                }
+              }
+            }
+
+            if (linkUrl) {
+              event.preventDefault();
+              if (isLocal) {
+                if (onNavigate) onNavigate(linkUrl);
+              } else {
+                import('@tauri-apps/plugin-opener').then(module => {
+                  module.openUrl(linkUrl!);
+                }).catch(err => {
+                  console.error("Failed to load plugin-opener:", err);
+                });
+              }
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+    });
+  }, [onNavigate, onCreateFile]);
 
   // When initialContent changes (e.g., file switched), update local state
   useEffect(() => {
     setContent(initialContent);
   }, [initialContent]);
 
+  const linkCompletionSource = React.useCallback(async (context: CompletionContext): Promise<CompletionResult | null> => {
+    let word = context.matchBefore(/\[\[[^\]]*/);
+    if (!word) return null;
+    if (word.from === word.to && !context.explicit) return null;
+
+    const query = word.text.slice(2);
+    if (query.includes('#')) {
+       const [fileName] = query.split('#');
+       const targetFile = (allFiles || []).find(f => f.name.replace(/\.md$/, '') === fileName || f.path === fileName);
+       if (targetFile) {
+          try {
+             const content = await readTextFile(targetFile.path);
+             const regex = /^(#{1,6})\s+(.*)$/gm;
+             let match;
+             const options = [];
+             while ((match = regex.exec(content)) !== null) {
+                const headingText = match[2];
+                options.push({
+                   label: headingText,
+                   type: "property",
+                   apply: `[${fileName} > ${headingText}](${targetFile.path}#${headingText.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '')})`
+                });
+             }
+             return {
+                from: word.from,
+                options
+             };
+          } catch(e) {
+             return null;
+          }
+       }
+    }
+
+    return {
+      from: word.from + 2,
+      options: (allFiles || []).map(f => ({
+        label: f.name.replace(/\.md$/, ''),
+        type: "text",
+        apply: `[${f.name.replace(/\.md$/, '')}](${f.path})`
+      }))
+    };
+  }, [allFiles]);
+
+  const macroCompletionSource = React.useCallback(async (context: CompletionContext): Promise<CompletionResult | null> => {
+    let word = context.matchBefore(/@[^ ]*/);
+    if (!word) return null;
+    if (word.from === word.to && !context.explicit) return null;
+
+    const query = word.text.slice(1);
+    if (query.includes('#')) {
+       const [fileName] = query.split('#');
+       const targetFile = (allFiles || []).find(f => f.name.replace(/\.md$/, '') === fileName || f.path === fileName);
+       if (targetFile) {
+          try {
+             const content = await readTextFile(targetFile.path);
+             const regex = /^(#{1,6})\s+(.*)$/gm;
+             let match;
+             const options = [];
+             while ((match = regex.exec(content)) !== null) {
+                const headingText = match[2];
+                options.push({
+                   label: headingText,
+                   type: "property",
+                   apply: `[${fileName} > ${headingText}](${targetFile.path}#${headingText.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '')})`
+                });
+             }
+             return {
+                from: word.from,
+                options
+             };
+          } catch(e) {
+             return null;
+          }
+       }
+    }
+
+    const today = new Date();
+    const macros = [
+      { label: "@today", type: "keyword", apply: format(today, 'yyyy-MM-dd') },
+      { label: "@tomorrow", type: "keyword", apply: format(addDays(today, 1), 'yyyy-MM-dd') },
+      { label: "@yesterday", type: "keyword", apply: format(subDays(today, 1), 'yyyy-MM-dd') },
+      { label: "@now", type: "keyword", apply: format(today, 'HH:mm:ss') }
+    ];
+
+    const fileOptions = (allFiles || []).map(f => ({
+      label: `@${f.name.replace(/\.md$/, '')}`,
+      type: "text",
+      apply: `[${f.name.replace(/\.md$/, '')}](${f.path})`
+    }));
+
+    return {
+      from: word.from,
+      options: [...macros, ...fileOptions]
+    };
+  }, [allFiles]);
+
   const handleChange = (val: string) => {
     setContent(val);
     // Debounce save in a real app, but for MVP we can save on blur or with a short timeout.
     // For now, let's just trigger save on change (might be expensive)
     onSave(val); 
+  };
+
+  const handleCreateEditor = (view: EditorView) => {
+    setEditorView(view);
+    if (initialCursorPos !== undefined) {
+      // Ensure the cursor position doesn't exceed document length
+      const pos = Math.min(initialCursorPos, view.state.doc.length);
+      view.dispatch({ selection: { anchor: pos } });
+      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    } else {
+      // Default to end of document
+      const pos = view.state.doc.length;
+      view.dispatch({ selection: { anchor: pos } });
+      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    }
+  };
+
+  const handleUpdate = (viewUpdate: ViewUpdate) => {
+    if (viewUpdate.selectionSet && onCursorChange) {
+      onCursorChange(viewUpdate.state.selection.main.head);
+    }
   };
 
   return (
@@ -426,19 +846,44 @@ export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName
             gladeTheme,
             syntaxHighlighting(markdownHighlighting),
             checkboxInteraction,
+            pasteHandler,
+            dropHandler,
+            typewriterScroll,
             livePreviewField,
+            linkHoverTooltip,
+            linkClickHandler,
+            closeBrackets(),
+            autocompletion({ override: [linkCompletionSource, macroCompletionSource] }),
+            keymap.of([
+              { key: "Enter", run: insertNewlineContinueMarkup },
+              { key: "Backspace", run: deleteMarkupBackward },
+              {
+                key: "Mod-k",
+                run: (view) => {
+                  const selection = view.state.selection.main;
+                  const selectedText = view.state.sliceDoc(selection.from, selection.to);
+                  view.dispatch({
+                    changes: { from: selection.from, to: selection.to, insert: `[${selectedText}]()` },
+                    selection: { anchor: selection.from + selectedText.length + 3 } // position inside ()
+                  });
+                  return true;
+                }
+              }
+            ]),
             ...(settings.wordWrap ? [EditorView.lineWrapping] : [])
           ]}
           onChange={handleChange}
+          onCreateEditor={handleCreateEditor}
+          onUpdate={handleUpdate}
           basicSetup={{
             lineNumbers: settings.lineNumbers,
-            foldGutter: false,
-            highlightActiveLine: false,
+            foldGutter: true,
+            highlightActiveLine: true,
           }}
         />
       </div>
     </div>
   );
-};
+});
 
 export default Editor;

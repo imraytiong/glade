@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { expect, test, describe, beforeEach } from 'vitest';
 import { SettingsProvider, useSettings } from '../settings';
