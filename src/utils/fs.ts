@@ -48,3 +48,15 @@ export async function readVaultRecursive(dirPath: string): Promise<FileNode[]> {
     return [];
   }
 }
+
+export function flattenFiles(nodes: FileNode[]): FileNode[] {
+  let result: FileNode[] = [];
+  for (const node of nodes) {
+    if (node.isDirectory && node.children) {
+      result = result.concat(flattenFiles(node.children));
+    } else if (!node.isDirectory) {
+      result.push(node);
+    }
+  }
+  return result;
+}

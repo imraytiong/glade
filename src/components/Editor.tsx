@@ -14,6 +14,8 @@ interface EditorProps {
   filePath: string;
 }
 
+import { useSettings } from '../utils/settings';
+
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { RangeSetBuilder } from '@codemirror/state';
 import { tags as t } from '@lezer/highlight';
@@ -390,6 +392,7 @@ const markdownHighlighting = HighlightStyle.define([
 
 
 export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName, filePath }) => {
+  const { settings } = useSettings();
   const [content, setContent] = useState(initialContent);
 
   const livePreviewField = React.useMemo(() => getLivePreviewField(filePath), [filePath]);
@@ -424,11 +427,11 @@ export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName
             syntaxHighlighting(markdownHighlighting),
             checkboxInteraction,
             livePreviewField,
-            EditorView.lineWrapping
+            ...(settings.wordWrap ? [EditorView.lineWrapping] : [])
           ]}
           onChange={handleChange}
           basicSetup={{
-            lineNumbers: false,
+            lineNumbers: settings.lineNumbers,
             foldGutter: false,
             highlightActiveLine: false,
           }}
