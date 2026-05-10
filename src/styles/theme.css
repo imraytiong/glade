@@ -1,0 +1,24 @@
+:root {
+  /* Colors */
+  --background-primary: #1e1e1e; /* Main editor background */
+  --background-secondary: #252525; /* Sidebar background */
+  --background-modifier-hover: rgba(255, 255, 255, 0.08);
+  --background-modifier-active: rgba(255, 255, 255, 0.15);
+  --background-modifier-active-hover: rgba(255, 255, 255, 0.2);
+  
+  --text-normal: #dcddde;
+  --text-muted: #8b8e90;
+  --text-faint: #5c5e60;
+  
+  --interactive-accent: #7d50ff; /* Purple accent like Obsidian */
+  --interactive-accent-hover: #6741d9;
+  
+  --scrollbar-thumb-bg: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover-bg: rgba(255, 255, 255, 0.3);
+
+  --divider-color: rgba(255, 255, 255, 0.1);
+
+  /* Typography */
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-monospace: "SFMono-Regular", Consolas, "Roboto Mono", "Droid Sans Mono", "Liberation Mono", Menlo, Courier, monospace;
+}
