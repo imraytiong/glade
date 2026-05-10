@@ -35,4 +35,14 @@ export default defineConfig(async () => ({
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['e2e/**', 'node_modules/**'], // Exclude playwright tests
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'lucide-react'],
+          codemirror: ['@codemirror/state', '@codemirror/view', '@codemirror/language', '@codemirror/commands', '@lezer/highlight', '@lezer/markdown'],
+        }
+      }
+    }
+  }
 }));

@@ -21,6 +21,7 @@ const FileExplorerNode: React.FC<{
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
+  const [clickTimeout, setClickTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const paddingLeft = `${level * 16 + 12}px`;
   const isActive = activeFilePath === node.path;
@@ -37,6 +38,32 @@ const FileExplorerNode: React.FC<{
     if (e.key === 'Escape') {
       setIsEditing(false);
       setEditName(node.name);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isEditing) return;
+
+    if (isActive) {
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        setClickTimeout(null);
+        // Double click - maybe default action or nothing
+      } else {
+        const timeout = setTimeout(() => {
+          setIsEditing(true);
+          setEditName(node.name);
+          setClickTimeout(null);
+        }, 500);
+        setClickTimeout(timeout);
+      }
+    } else {
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        setClickTimeout(null);
+      }
+      onFileSelect(node);
     }
   };
 
@@ -76,7 +103,7 @@ const FileExplorerNode: React.FC<{
     <div 
       className={`file-node ${isActive ? 'active' : ''}`}
       style={{ paddingLeft }}
-      onClick={() => !isEditing && onFileSelect(node)}
+      onClick={handleClick}
       onContextMenu={(e) => {
         e.preventDefault();
         setIsEditing(true);

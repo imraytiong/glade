@@ -49,3 +49,65 @@ html, body, #root {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+.backlinks-card {
+  margin: 2rem;
+  padding: 1.5rem;
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  font-family: var(--font-text);
+  overflow-y: auto;
+  max-height: 30vh;
+}
+
+.backlinks-card h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.backlinks-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.backlinks-card li {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.backlinks-card button {
+  background: none;
+  border: none;
+  color: var(--interactive-accent);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.backlinks-card button:hover {
+  text-decoration: underline;
+}
+
+.backlinks-card span {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  background: var(--background-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

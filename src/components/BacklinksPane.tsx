@@ -29,21 +29,18 @@ export default function BacklinksPane({ activeFilePath, activeFileContent, onNav
   if (!settings.showBacklinks) return null;
 
   return (
-    <div className="backlinks-pane" style={{ borderTop: '1px solid var(--border)', padding: '1rem', marginTop: 'auto', backgroundColor: 'var(--bg-secondary)', overflowY: 'auto', maxHeight: '30vh' }}>
-      <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Backlinks</h3>
+    <div className="backlinks-card">
+      <h3>Backlinks</h3>
       {backlinks.length === 0 ? (
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No backlinks found.</p>
       ) : (
-        <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+        <ul>
           {backlinks.map((link, i) => (
-            <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              <button 
-                onClick={() => onNavigate(link.sourcePath)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-accent)', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-              >
+            <li key={i}>
+              <button onClick={() => onNavigate(link.sourcePath)}>
                 {link.sourcePath.split(/[/\\]/).pop()}
               </button>
-              <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>"{link.originalText}"</span>
+              <span>"{link.originalText}"</span>
             </li>
           ))}
         </ul>
@@ -51,17 +48,14 @@ export default function BacklinksPane({ activeFilePath, activeFileContent, onNav
 
       {unlinkedMentions.length > 0 && (
         <>
-          <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem', marginTop: '1rem', color: 'var(--text-primary)' }}>Unlinked Mentions</h3>
-          <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+          <h3 style={{ marginTop: '1.5rem' }}>Unlinked Mentions</h3>
+          <ul>
             {unlinkedMentions.map((mention, i) => (
-              <li key={i} style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                <button 
-                  onClick={() => onNavigate(mention.targetPath)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-accent)', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-                >
+              <li key={i}>
+                <button onClick={() => onNavigate(mention.targetPath)}>
                   {mention.targetPath.split(/[/\\]/).pop()}
                 </button>
-                <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>Mentioned as "{mention.label}"</span>
+                <span>Mentioned as "{mention.label}"</span>
               </li>
             ))}
           </ul>

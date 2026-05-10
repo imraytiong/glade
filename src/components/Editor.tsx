@@ -21,15 +21,18 @@ interface EditorProps {
   allFiles?: { name: string, path: string }[];
   onNavigate?: (filePath: string) => void;
   onCreateFile?: (fileName: string) => void;
+  onRename?: (oldPath: string, newName: string) => void;
+  children?: React.ReactNode;
 }
 
 import { useSettings } from '../utils/settings';
 
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
-import { RangeSetBuilder } from '@codemirror/state';
+// Imports moved or consolidated
 import { tags as t } from '@lezer/highlight';
 import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 import { GFM } from '@lezer/markdown';
+import { marked } from 'marked';
 
 class BulletWidget extends WidgetType {
   constructor(readonly text: string) { super(); }
@@ -379,34 +382,23 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
     }
   });
 
-  marks.sort((a, b) => {
-    if (a.from !== b.from) return a.from - b.from;
-    const isLineA = a.type.startsWith("line");
-    const isLineB = b.type.startsWith("line");
-    if (isLineA && !isLineB) return -1;
-    if (!isLineA && isLineB) return 1;
-    return a.to - b.to;
-  });
-  
-  const builder = new RangeSetBuilder<Decoration>();
-  let lastTo = -1;
-  for (const mark of marks) {
+  const decorations = marks.map(mark => {
     if (mark.type === "line") {
-      builder.add(mark.from, mark.from, codeBlockLineDeco);
-    } else if (mark.from >= lastTo) {
-      if (mark.type === "hide") {
-        builder.add(mark.from, mark.to, hideMarkDeco);
-      } else if (mark.type === "replace" && mark.widget) {
-        builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget }));
-      } else if (mark.type === "replace-block" && mark.widget) {
-        builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget, block: true }));
-      } else if (mark.type === "mark-dangling") {
-        builder.add(mark.from, mark.to, danglingLinkDeco);
-      }
-      lastTo = mark.to;
+      return codeBlockLineDeco.range(mark.from, mark.from);
+    } else if (mark.type === "hide") {
+      return hideMarkDeco.range(mark.from, mark.to);
+    } else if (mark.type === "replace" && mark.widget) {
+      return Decoration.replace({ widget: mark.widget }).range(mark.from, mark.to);
+    } else if (mark.type === "replace-block" && mark.widget) {
+      return Decoration.replace({ widget: mark.widget, block: true }).range(mark.from, mark.to);
+    } else if (mark.type === "mark-dangling") {
+      return danglingLinkDeco.range(mark.from, mark.to);
     }
-  }
-  return builder.finish();
+    return null;
+  }).filter((d): d is any => d !== null);
+
+  // Use Decoration.set which automatically sorts and handles overlapping marks safely
+  return Decoration.set(decorations, true);
 };
 
 const getLinkHoverTooltip = (filePath: string, validPaths: Set<string>) => hoverTooltip(async (view, pos) => {
@@ -425,14 +417,14 @@ const getLinkHoverTooltip = (filePath: string, validPaths: Set<string>) => hover
         }
         if (n?.name === "Link") {
           const urlNode = n.getChild("URL");
-          if (urlNode && urlNode.from <= pos && urlNode.to >= pos) {
+          if (urlNode) {
               const doc = view.state.doc.sliceString(n.from, n.to);
               const match = doc.match(/\[(.*?)\]\((.*?)\)/);
               if (match) {
                  linkUrl = match[2];
                  isLink = true;
-                 tooltipFrom = urlNode.from;
-                 tooltipTo = urlNode.to;
+                 tooltipFrom = n.from;
+                 tooltipTo = n.to;
               }
           }
         }
@@ -490,9 +482,14 @@ const getLinkHoverTooltip = (filePath: string, validPaths: Set<string>) => hover
       } else {
          if (validPaths.has(absPath)) {
             dom.textContent = "Loading preview...";
-            readTextFile(absPath).then(content => {
+            readTextFile(absPath).then(async content => {
                const preview = content.length > 500 ? content.substring(0, 500) + '...' : content;
-               dom.innerHTML = `<strong style="display:block;margin-bottom:8px;">${absPath.split('/').pop()}</strong><div style="color: var(--text-muted); font-size: 13px;">${preview}</div>`;
+               try {
+                 const htmlPreview = await marked.parse(preview);
+                 dom.innerHTML = `<strong style="display:block;margin-bottom:8px;border-bottom:1px solid var(--background-modifier-border);padding-bottom:4px;">${absPath.split('/').pop()}</strong><div style="color: var(--text-normal); font-size: 13px;">${htmlPreview}</div>`;
+               } catch (e) {
+                 dom.innerHTML = `<strong style="display:block;margin-bottom:8px;border-bottom:1px solid var(--background-modifier-border);padding-bottom:4px;">${absPath.split('/').pop()}</strong><div style="color: var(--text-muted); font-size: 13px;">${preview}</div>`;
+               }
             }).catch(() => {
                dom.textContent = "Error loading preview.";
             });
@@ -563,8 +560,8 @@ const gladeTheme = EditorView.theme({
     padding: "0",
   },
   ".cm-link-dangling": {
-    color: "var(--text-faint)",
-    opacity: "0.8",
+    color: "var(--text-error, #f87171) !important",
+    textDecoration: "underline wavy var(--text-error, #f87171) !important"
   }
 }, { dark: false });
 
@@ -593,10 +590,25 @@ export interface EditorHandle {
   scrollToHeader: (hash: string) => void;
 }
 
-export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialContent, onSave, fileName, filePath, initialCursorPos, onCursorChange, allFiles, onNavigate, onCreateFile }, ref) => {
+export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialContent, onSave, fileName, filePath, initialCursorPos, onCursorChange, allFiles, onNavigate, onCreateFile, onRename, children }, ref) => {
   const { settings } = useSettings();
   const [content, setContent] = useState(initialContent);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+
+  const startEditingTitle = () => {
+    setIsEditingTitle(true);
+    setEditTitle(fileName.replace(/\.md$/, ''));
+  };
+
+  const submitTitleEdit = () => {
+    setIsEditingTitle(false);
+    if (editTitle && editTitle !== fileName.replace(/\.md$/, '') && onRename) {
+      onRename(filePath, editTitle);
+    }
+  };
 
   const scrollToHeader = React.useCallback((hash: string) => {
     if (!editorView) return;
@@ -833,7 +845,27 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
     <div className="editor-wrapper">
       <div className="editor-header">
         <div className="editor-header-inner">
-          <span className="file-name">{fileName}</span>
+          {isEditingTitle ? (
+            <input 
+              autoFocus
+              className="file-name editor-title-input"
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              onBlur={submitTitleEdit}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') {
+                  setEditTitle(fileName.replace(/\.md$/, ''));
+                  setIsEditingTitle(false);
+                }
+              }}
+              style={{ background: 'transparent', color: 'inherit', border: 'none', outline: 'none', fontSize: 'inherit', fontWeight: 'inherit', width: `${Math.max(editTitle.length, 5)}ch` }}
+            />
+          ) : (
+            <span className="file-name" onClick={startEditingTitle} style={{ cursor: 'text' }}>
+              {fileName.replace(/\.md$/, '')}
+            </span>
+          )}
         </div>
       </div>
       <div className="editor-scroll-area">
@@ -881,6 +913,7 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
             highlightActiveLine: true,
           }}
         />
+        {children}
       </div>
     </div>
   );

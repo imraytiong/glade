@@ -10,10 +10,14 @@ interface TabBarProps {
   onTabClose: (e: React.MouseEvent, index: number) => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onRename?: (oldPath: string, newName: string) => void;
 }
 
-const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick, onTabClose, isSidebarOpen, onToggleSidebar }) => {
+const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick, onTabClose, isSidebarOpen, onToggleSidebar, onRename }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+  const [editName, setEditName] = React.useState("");
   
   // Auto-scroll to active tab
   useEffect(() => {
@@ -39,6 +43,23 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
     }
   };
 
+  const startEditing = (e: React.MouseEvent, index: number, currentName: string) => {
+    e.stopPropagation();
+    if (index === activeFileIndex) {
+      setEditingIndex(index);
+      setEditName(currentName.replace(/\.md$/, ''));
+    } else {
+      onTabClick(index);
+    }
+  };
+
+  const submitEdit = (index: number, oldPath: string) => {
+    setEditingIndex(null);
+    if (editName && onRename) {
+      onRename(oldPath, editName);
+    }
+  };
+
   if (openFiles.length === 0) return null;
 
   return (
@@ -61,9 +82,41 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
         <div
           key={`${file.path}-${index}`}
           className={`tab ${index === activeFileIndex ? 'active' : ''}`}
-          onClick={() => onTabClick(index)}
+          onClick={(e) => {
+            if (editingIndex !== index) {
+               onTabClick(index);
+            }
+          }}
         >
-          <span className="tab-title">{file.name.replace(/\.md$/, '')}</span>
+          <span 
+            className="tab-title" 
+            onClick={(e) => {
+              if (index === activeFileIndex && editingIndex !== index) {
+                startEditing(e, index, file.name);
+              }
+            }}
+          >
+            {editingIndex === index ? (
+              <input 
+                autoFocus
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onBlur={() => submitEdit(index, file.path)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Escape') {
+                    setEditName(file.name.replace(/\.md$/, ''));
+                    setEditingIndex(null);
+                  }
+                }}
+                onClick={e => e.stopPropagation()}
+                className="tab-rename-input"
+                style={{ width: `${Math.max(editName.length, 3)}ch`, background: 'transparent', color: 'inherit', border: 'none', outline: 'none' }}
+              />
+            ) : (
+              file.name.replace(/\.md$/, '')
+            )}
+          </span>
           <button 
             className="tab-close-btn"
             onClick={(e) => onTabClose(e, index)}

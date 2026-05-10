@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, rename } from '@tauri-apps/plugin-fs';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Settings } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
@@ -12,6 +12,7 @@ import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import CommandPalette from './components/CommandPalette';
 import BacklinksPane from './components/BacklinksPane';
+import SettingsDialog from './components/SettingsDialog';
 import './App.css';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
   
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   
   const [toast, setToast] = useState<{ message: string, action?: { label: string, onClick: () => void } } | null>(null);
   const showToast = useCallback((message: string, action?: { label: string, onClick: () => void }) => {
@@ -161,6 +163,9 @@ function App() {
         if (hash) setPendingScrollHash(hash);
         handleOpenFile(target);
       }
+    } else {
+      // Auto-create dangling link target
+      handleCreateFile(filePath);
     }
   };
 
@@ -363,10 +368,7 @@ function App() {
         <div className="sidebar">
           <div className="sidebar-header">
             <span className="sidebar-title">Glade</span>
-          <button className="icon-btn" onClick={handleOpenVault} title="Open Vault">
-            <FolderOpen size={16} />
-          </button>
-        </div>
+          </div>
         
         <div className="sidebar-content">
           {vaultPath ? (
@@ -381,6 +383,15 @@ function App() {
               No vault opened.
             </div>
           )}
+        </div>
+        
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '12px 16px', gap: '8px' }}>
+          <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FolderOpen size={16} />
+          </button>
+          <button className="icon-btn" onClick={() => setIsSettingsOpen(true)} title="Settings" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Settings size={16} />
+          </button>
         </div>
       </div>
       )}
@@ -402,6 +413,7 @@ function App() {
                 onTabClose={handleTabClose}
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                onRename={handleRenameFile}
               />
             )}
             
@@ -425,12 +437,14 @@ function App() {
                       allFiles={flattenFiles(fileTree)}
                       onNavigate={handleNavigate}
                       onCreateFile={handleCreateFile}
-                    />
-                    <BacklinksPane 
-                      activeFilePath={activeFile.path} 
-                      activeFileContent={activeFileContent.content} 
-                      onNavigate={handleNavigate} 
-                    />
+                      onRename={handleRenameFile}
+                    >
+                      <BacklinksPane 
+                        activeFilePath={activeFile.path} 
+                        activeFileContent={activeFileContent.content} 
+                        onNavigate={handleNavigate} 
+                      />
+                    </Editor>
                   </>
                 ) : (
                   <div className="loading-editor" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-faint)' }}>Loading...</div>
@@ -456,6 +470,11 @@ function App() {
         commands={commands}
         onFileSelect={handlePaletteSelect}
         hotkeys={settings.hotkeys}
+      />
+      
+      <SettingsDialog 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
       />
     </div>
   );
