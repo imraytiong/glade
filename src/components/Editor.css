@@ -87,18 +87,8 @@
   user-select: none;
   -webkit-user-select: none;
 }
-.cm-list-bullet {
-  color: transparent !important;
-  display: inline-block;
-  width: 1.2em;
-  position: relative;
-}
 
-.cm-list-bullet::after {
-  content: "•";
+.cm-bullet-widget {
   color: var(--text-normal);
-  position: absolute;
-  left: 0;
-  top: 0;
   font-weight: bold;
 }

@@ -18,6 +18,18 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/lang
 import { RangeSetBuilder } from '@codemirror/state';
 import { tags as t } from '@lezer/highlight';
 import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
+import { GFM } from '@lezer/markdown';
+
+class BulletWidget extends WidgetType {
+  constructor(readonly text: string) { super(); }
+  eq(other: BulletWidget) { return this.text === other.text; }
+  toDOM() {
+    const span = document.createElement("span");
+    span.textContent = this.text;
+    span.className = "cm-bullet-widget";
+    return span;
+  }
+}
 
 class CheckboxWidget extends WidgetType {
   constructor(readonly checked: boolean) { super(); }
@@ -79,7 +91,24 @@ class ImageWidget extends WidgetType {
     if (!this.url.startsWith('http') && !this.url.startsWith('data:') && !this.url.startsWith('tauri://') && this.filePath) {
       const dir = this.filePath.substring(0, Math.max(this.filePath.lastIndexOf('/'), this.filePath.lastIndexOf('\\')));
       const isAbsolute = this.url.startsWith('/') || this.url.match(/^[a-zA-Z]:\\/);
-      const resolvedPath = isAbsolute ? this.url : `${dir}/${this.url}`;
+      
+      const normalizePath = (path: string) => {
+        const isAbs = path.startsWith('/');
+        const parts = path.split(/[/\\]/);
+        const result: string[] = [];
+        for (const part of parts) {
+          if (part === '.' || part === '') continue;
+          if (part === '..') {
+            if (result.length > 0 && result[result.length - 1] !== '..') result.pop();
+            else result.push('..');
+          } else {
+            result.push(part);
+          }
+        }
+        return (isAbs ? '/' : '') + result.join('/');
+      };
+      
+      const resolvedPath = isAbsolute ? this.url : normalizePath(`${dir}/${this.url}`);
       
       try {
         absoluteUrl = convertFileSrc(resolvedPath);
@@ -97,6 +126,14 @@ class ImageWidget extends WidgetType {
     img.style.display = "block";
     img.style.margin = "8px 0";
     wrap.appendChild(img);
+    
+    // DEBUG: Show the absoluteUrl text next to the image
+    const debugText = document.createElement("div");
+    debugText.textContent = "DEBUG URL: " + absoluteUrl;
+    debugText.style.color = "red";
+    debugText.style.fontSize = "12px";
+    wrap.appendChild(debugText);
+    
     return wrap;
   }
 }
@@ -143,7 +180,6 @@ const hideMarkDeco = Decoration.replace({});
 const codeBlockLineDeco = Decoration.line({
   attributes: { class: "cm-codeblock-line" }
 });
-const bulletMarkDeco = Decoration.mark({ class: "cm-list-bullet" });
 
 import { EditorState, StateField } from '@codemirror/state';
 
@@ -221,7 +257,12 @@ const buildDeco = (state: EditorState, filePath: string) => {
           if (!hasTask) {
             const text = state.doc.sliceString(node.from, node.to);
             if (/^[-*+]\s*$/.test(text)) {
-              marks.push({from: node.from, to: node.to, type: "mark-bullet"});
+              marks.push({
+                from: node.from, 
+                to: node.to, 
+                type: "replace", 
+                widget: new BulletWidget(text.replace(/[-*+]/, "•"))
+              });
             }
           }
         }
@@ -235,7 +276,7 @@ const buildDeco = (state: EditorState, filePath: string) => {
         name === "CodeMark" ||
         name === "QuoteMark" ||
         name === "LinkMark" ||
-        name === "URL"
+        (name === "URL" && node.node.parent?.name === "Link")
       ) {
         marks.push({from: node.from, to: node.to, type: "hide"});
       }
@@ -259,8 +300,6 @@ const buildDeco = (state: EditorState, filePath: string) => {
     } else if (mark.from >= lastTo) {
       if (mark.type === "hide") {
         builder.add(mark.from, mark.to, hideMarkDeco);
-      } else if (mark.type === "mark-bullet") {
-        builder.add(mark.from, mark.to, bulletMarkDeco);
       } else if (mark.type === "replace" && mark.widget) {
         builder.add(mark.from, mark.to, Decoration.replace({ widget: mark.widget }));
       } else if (mark.type === "replace-block" && mark.widget) {
@@ -342,7 +381,7 @@ const markdownHighlighting = HighlightStyle.define([
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: t.link, color: "var(--interactive-accent)", textDecoration: "underline" },
-  { tag: t.url, color: "var(--text-muted)" },
+  { tag: t.url, color: "var(--interactive-accent)", textDecoration: "underline" },
   { tag: t.quote, borderLeft: "3px solid var(--interactive-accent)", paddingLeft: "12px", color: "var(--text-muted)", fontStyle: "italic" },
   { tag: t.monospace, fontFamily: "var(--font-monospace)", backgroundColor: "var(--background-modifier-hover)", padding: "2px 4px", borderRadius: "4px", fontSize: "0.9em" },
   { tag: t.comment, color: "var(--text-faint)", fontStyle: "italic" },
@@ -380,7 +419,7 @@ export const Editor: React.FC<EditorProps> = ({ initialContent, onSave, fileName
           value={content}
           height="100%"
           extensions={[
-            markdown({ base: markdownLanguage, codeLanguages: languages }),
+            markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
             gladeTheme,
             syntaxHighlighting(markdownHighlighting),
             checkboxInteraction,

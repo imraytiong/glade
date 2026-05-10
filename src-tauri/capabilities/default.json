@@ -12,7 +12,7 @@
     "dialog:default",
     {
       "identifier": "fs:allow-read",
-      "allow": [{ "path": "**" }]
+      "allow": [{ "path": "**" }, { "path": "**/*" }, { "path": "/**" }, { "path": "/**/*" }]
     },
     {
       "identifier": "fs:allow-write",

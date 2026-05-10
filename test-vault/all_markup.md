@@ -41,7 +41,7 @@ function helloWorld() {
 ```
 
 Here is a link: [Glade Markdown Editor](https://github.com)
-Here is a raw URL: https://example.com
+  Here is a raw URL: https://example.com
 
 Here is a horizontal rule:
 ___
@@ -49,7 +49,7 @@ ___
 ---
 
 Finally, an image:
-![Sample Image Placeholder](https://via.placeholder.com/150)
+![Local Test Image](../test_screenshot.png)
 
 Here is a table:
 | Column 1 | Column 2 | Column 3 |
