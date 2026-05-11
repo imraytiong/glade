@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Editor from '../Editor';
 
 // Mock settings
@@ -30,7 +30,7 @@ describe('Editor', () => {
       />
     );
     
-    expect(screen.getByText('test.md')).toBeInTheDocument();
+    expect(screen.getByText('test')).toBeInTheDocument();
   });
 
   // Note: testing exact CodeMirror cursor position via react-testing-library
@@ -53,5 +53,33 @@ describe('Editor', () => {
         />
       );
     }).not.toThrow();
+  });
+
+  it('parses and displays front matter in preview mode', async () => {
+    const onSave = vi.fn();
+    const markdownWithFrontmatter = `---
+title: "Test Document"
+author: "Alice"
+---
+
+# Content here`;
+
+    render(
+      <Editor 
+        initialContent={markdownWithFrontmatter}
+        onSave={onSave} 
+        fileName="frontmatter.md" 
+        filePath="/frontmatter.md" 
+      />
+    );
+    
+    // Switch to reading mode
+    const previewBtn = screen.getByTitle('Reading Mode');
+    fireEvent.click(previewBtn);
+    
+    // Wait for the frontmatter div to be rendered
+    await waitFor(() => {
+      expect(screen.getByText(/Test Document/)).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 });

@@ -60,6 +60,18 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
               style={{ cursor: 'pointer' }}
             />
           </div>
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px', display: 'flex', flexDirection: 'column' }}>
+              Focus / Typewriter Mode
+              <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>Keep cursor in the center of the screen</span>
+            </span>
+            <input 
+              type="checkbox" 
+              checked={settings.typewriterMode} 
+              onChange={e => updateSettings({ typewriterMode: e.target.checked })}
+              style={{ cursor: 'pointer' }}
+            />
+          </div>
         </div>
       </div>
     </div>

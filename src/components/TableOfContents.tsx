@@ -1,0 +1,50 @@
+import React, { useMemo } from 'react';
+import './TableOfContents.css';
+
+interface TableOfContentsProps {
+  content: string;
+  onNavigateHeader: (hash: string) => void;
+}
+
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onNavigateHeader }) => {
+  const headings = useMemo(() => {
+    // Only match markdown headings at the start of a line
+    const regex = /^(#{1,6})\s+(.*)$/gm;
+    let match;
+    const items = [];
+    while ((match = regex.exec(content)) !== null) {
+      items.push({
+        level: match[1].length,
+        text: match[2],
+        id: match[2].toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '')
+      });
+    }
+    return items;
+  }, [content]);
+
+  if (headings.length === 0) return null;
+
+  return (
+    <div className="table-of-contents">
+      <div className="toc-header">
+        <h3 className="toc-title">Outline</h3>
+      </div>
+      <div className="toc-content">
+        <ul className="toc-list">
+          {headings.map((heading, i) => (
+            <li 
+              key={i} 
+              className={`toc-item toc-level-${heading.level}`} 
+              onClick={() => onNavigateHeader(heading.id)}
+              title={heading.text}
+            >
+              {heading.text}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
+export default TableOfContents;

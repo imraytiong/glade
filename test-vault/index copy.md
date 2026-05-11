@@ -1,8 +1,3 @@
----
-name: ray
-date: 2026-05-10
----
-
 # Agentic Software Development Vault
 
 Welcome to the knowledge base.
@@ -16,3 +11,4 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 []()
 
+This is typing mode

@@ -12,6 +12,7 @@ import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import CommandPalette from './components/CommandPalette';
 import BacklinksPane from './components/BacklinksPane';
+import TableOfContents from './components/TableOfContents';
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import './App.css';
@@ -240,6 +241,11 @@ function App() {
       id: 'app.toggleSidebar',
       name: 'Toggle Sidebar',
       action: () => setIsSidebarOpen(prev => !prev),
+    },
+    {
+      id: 'app.toggleTypewriterMode',
+      name: 'Toggle Typewriter Mode',
+      action: () => updateSettings({ typewriterMode: !settings.typewriterMode }),
     },
     {
       id: 'app.closeTab',
@@ -548,7 +554,7 @@ function App() {
           )}
         </div>
         
-        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '6px 16px', gap: '8px' }}>
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '3px 16px', gap: '8px' }}>
           <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FolderOpen size={16} />
           </button>
@@ -587,28 +593,36 @@ function App() {
             ) : (
               <div className="editor-container">
                 {activeFileContent && activeFileContent.path === activeFile.path ? (
-                  <>
-                    <Editor 
-                      key={activeFileContent.path}
-                      ref={editorRef}
-                      initialContent={activeFileContent.content} 
-                      onSave={handleSaveFile} 
-                      fileName={activeFile.name}
-                      filePath={activeFile.path}
-                      initialCursorPos={cursorPositions[activeFile.path]}
-                      onCursorChange={(pos) => handleCursorChange(activeFile.path, pos)}
-                      allFiles={flattenFiles(fileTree)}
-                      onNavigate={handleNavigate}
-                      onCreateFile={handleCreateFile}
-                      onRename={handleRenameFile}
-                    >
-                      <BacklinksPane 
-                        activeFilePath={activeFile.path} 
-                        activeFileContent={activeFileContent.content} 
-                        onNavigate={handleNavigate} 
+                  <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                      <Editor 
+                        key={activeFileContent.path}
+                        ref={editorRef}
+                        initialContent={activeFileContent.content} 
+                        onSave={handleSaveFile} 
+                        fileName={activeFile.name}
+                        filePath={activeFile.path}
+                        initialCursorPos={cursorPositions[activeFile.path]}
+                        onCursorChange={(pos) => handleCursorChange(activeFile.path, pos)}
+                        allFiles={flattenFiles(fileTree)}
+                        onNavigate={handleNavigate}
+                        onCreateFile={handleCreateFile}
+                        onRename={handleRenameFile}
+                      >
+                        <BacklinksPane 
+                          activeFilePath={activeFile.path} 
+                          activeFileContent={activeFileContent.content} 
+                          onNavigate={handleNavigate} 
+                        />
+                      </Editor>
+                    </div>
+                    {!isZenMode && (
+                      <TableOfContents 
+                        content={activeFileContent.content} 
+                        onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
                       />
-                    </Editor>
-                  </>
+                    )}
+                  </div>
                 ) : (
                   <div className="loading-editor" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-faint)' }}>Loading...</div>
                 )}

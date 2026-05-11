@@ -4,6 +4,7 @@ export interface Settings {
   wordWrap: boolean;
   lineNumbers: boolean;
   showBacklinks: boolean;
+  typewriterMode: boolean;
   hotkeys: Record<string, string>;
 }
 
@@ -11,6 +12,7 @@ export const defaultSettings: Settings = {
   wordWrap: true,
   lineNumbers: false,
   showBacklinks: true,
+  typewriterMode: false,
   hotkeys: {
     "file.search": "Cmd+F",
     "command.palette": "Cmd+P",

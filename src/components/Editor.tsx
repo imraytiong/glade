@@ -33,6 +33,70 @@ import { tags as t } from '@lezer/highlight';
 import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 import { GFM } from '@lezer/markdown';
 import { marked } from 'marked';
+import matter from 'gray-matter';
+import Prism from 'prismjs';
+import 'prismjs/themes/prism-tomorrow.css';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import mermaid from 'mermaid';
+import { search, searchKeymap } from '@codemirror/search';
+import { Code, Edit2, BookOpen } from 'lucide-react';
+
+mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+const getMarkedOptions = (filePath: string) => {
+  const renderer = new marked.Renderer();
+
+  renderer.image = ({ href, title, text }) => {
+    let absoluteUrl = href;
+    if (href && !href.startsWith('http') && !href.startsWith('data:') && !href.startsWith('tauri://') && filePath) {
+      const dir = filePath.substring(0, Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')));
+      const isAbsolute = href.startsWith('/') || href.match(/^[a-zA-Z]:\\/);
+      
+      const normalizePath = (path: string) => {
+        const isAbs = path.startsWith('/');
+        const parts = path.split(/[/\\]/);
+        const result: string[] = [];
+        for (const part of parts) {
+          if (part === '.' || part === '') continue;
+          if (part === '..') {
+            if (result.length > 0 && result[result.length - 1] !== '..') result.pop();
+            else result.push('..');
+          } else {
+            result.push(part);
+          }
+        }
+        return (isAbs ? '/' : '') + result.join('/');
+      };
+      
+      const resolvedPath = isAbsolute ? href : normalizePath(`${dir}/${href}`);
+      
+      try {
+        absoluteUrl = convertFileSrc(resolvedPath);
+      } catch (e) {}
+    }
+    return `<img src="${absoluteUrl}" alt="${text || ''}" title="${title || ''}" style="max-width: 100%; border-radius: 4px; margin: 8px 0;" />`;
+  };
+
+  renderer.code = ({ text, lang }) => {
+    if (lang === 'mermaid') {
+      return `<div class="mermaid">${text}</div>`;
+    }
+    const validLang = lang && Prism.languages[lang as string] ? (lang as string) : 'markup';
+    const highlighted = Prism.highlight(text, Prism.languages[validLang], validLang);
+    return `<pre><code class="language-${lang || 'markup'}">${highlighted}</code></pre>`;
+  };
+
+  return {
+    renderer,
+    gfm: true,
+    breaks: true,
+  };
+};
+
 
 class BulletWidget extends WidgetType {
   constructor(readonly text: string) { super(); }
@@ -153,7 +217,7 @@ const dropHandler = EditorView.domEventHandlers({
 });
 
 const typewriterScroll = EditorState.transactionExtender.of((tr) => {
-  if (tr.docChanged && tr.selection) {
+  if (tr.selection || tr.docChanged) {
     return {
       effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: 'center' })
     };
@@ -263,8 +327,24 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
   const selection = state.selection.main;
   const activeLine = state.doc.lineAt(selection.head);
 
+  let frontmatterEndPos = -1;
+  if (state.doc.lines > 0 && state.doc.line(1).text.trim() === '---') {
+    frontmatterEndPos = state.doc.line(1).to;
+    for (let i = 2; i <= state.doc.lines; i++) {
+      if (state.doc.line(i).text.trim() === '---') {
+        frontmatterEndPos = state.doc.line(i).to;
+        break;
+      }
+    }
+  }
+
   syntaxTree(state).iterate({
     enter: (node) => {
+      if (node.name === "Document") return true;
+      if (frontmatterEndPos !== -1 && node.to <= frontmatterEndPos) {
+        return false;
+      }
+
       const isActiveLine = node.from >= activeLine.from && node.from <= activeLine.to;
       const name = node.name;
       
@@ -396,6 +476,10 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
     }
     return null;
   }).filter((d): d is any => d !== null);
+
+  if (frontmatterEndPos > 0) {
+    decorations.push(Decoration.mark({ class: "cm-frontmatter" }).range(0, frontmatterEndPos));
+  }
 
   // Use Decoration.set which automatically sorts and handles overlapping marks safely
   return Decoration.set(decorations, true);
@@ -597,6 +681,24 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
+  const [viewMode, setViewMode] = useState<'source' | 'rich' | 'reading'>('rich');
+  const [parsedData, setParsedData] = useState<{data: any, content: string}>({ data: {}, content: initialContent });
+
+  useEffect(() => {
+    try {
+      const parsed = matter(content);
+      setParsedData(parsed);
+    } catch (e) {
+      setParsedData({ data: {}, content });
+    }
+  }, [content]);
+
+  useEffect(() => {
+    if (viewMode !== 'edit') {
+      setTimeout(() => mermaid.run(), 100);
+    }
+  }, [content, viewMode]);
+
 
   const startEditingTitle = () => {
     setIsEditingTitle(true);
@@ -866,54 +968,112 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
               {fileName.replace(/\.md$/, '')}
             </span>
           )}
+          <div className="editor-mode-toggles">
+            <button className={`toggle-btn ${viewMode === 'source' ? 'active' : ''}`} onClick={() => setViewMode('source')} title="Source Mode">
+              <Code size={14} />
+            </button>
+            <button className={`toggle-btn ${viewMode === 'rich' ? 'active' : ''}`} onClick={() => setViewMode('rich')} title="Rich Edit Mode">
+              <Edit2 size={14} />
+            </button>
+            <button className={`toggle-btn ${viewMode === 'reading' ? 'active' : ''}`} onClick={() => setViewMode('reading')} title="Reading Mode">
+              <BookOpen size={14} />
+            </button>
+          </div>
         </div>
       </div>
-      <div className="editor-scroll-area">
-        <CodeMirror
-          className="cm-outer-wrapper"
-          value={content}
-          height="auto"
-          extensions={[
-            markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
-            gladeTheme,
-            syntaxHighlighting(markdownHighlighting),
-            checkboxInteraction,
-            pasteHandler,
-            dropHandler,
-            typewriterScroll,
-            livePreviewField,
-            linkHoverTooltip,
-            linkClickHandler,
-            closeBrackets(),
-            autocompletion({ override: [linkCompletionSource, macroCompletionSource] }),
-            keymap.of([
-              { key: "Enter", run: insertNewlineContinueMarkup },
-              { key: "Backspace", run: deleteMarkupBackward },
-              {
-                key: "Mod-k",
-                run: (view) => {
-                  const selection = view.state.selection.main;
-                  const selectedText = view.state.sliceDoc(selection.from, selection.to);
-                  view.dispatch({
-                    changes: { from: selection.from, to: selection.to, insert: `[${selectedText}]()` },
-                    selection: { anchor: selection.from + selectedText.length + 3 } // position inside ()
-                  });
-                  return true;
+      <div className={`editor-content-area mode-${viewMode}`}>
+        {(viewMode === 'source' || viewMode === 'rich') && (
+          <div className="editor-scroll-area">
+            <CodeMirror
+              className={`cm-outer-wrapper ${settings.typewriterMode ? 'typewriter-active' : ''}`}
+              value={content}
+              height="auto"
+              extensions={[
+                markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
+                gladeTheme,
+                syntaxHighlighting(markdownHighlighting),
+                checkboxInteraction,
+                pasteHandler,
+                dropHandler,
+                ...(settings.typewriterMode ? [typewriterScroll] : []),
+                ...(viewMode === 'rich' ? [livePreviewField] : []),
+                linkHoverTooltip,
+                linkClickHandler,
+                closeBrackets(),
+                search({ top: true }),
+                autocompletion({ override: [linkCompletionSource, macroCompletionSource] }),
+                keymap.of([
+                  ...searchKeymap,
+                  { key: "Enter", run: insertNewlineContinueMarkup },
+                  { key: "Backspace", run: deleteMarkupBackward },
+                  {
+                    key: "Mod-k",
+                    run: (view) => {
+                      const selection = view.state.selection.main;
+                      const selectedText = view.state.sliceDoc(selection.from, selection.to);
+                      view.dispatch({
+                        changes: { from: selection.from, to: selection.to, insert: `[${selectedText}]()` },
+                        selection: { anchor: selection.from + selectedText.length + 3 } // position inside ()
+                      });
+                      return true;
+                    }
+                  }
+                ]),
+                ...(settings.wordWrap ? [EditorView.lineWrapping] : [])
+              ]}
+              onChange={handleChange}
+              onCreateEditor={handleCreateEditor}
+              onUpdate={handleUpdate}
+              basicSetup={{
+                lineNumbers: settings.lineNumbers,
+                foldGutter: true,
+                highlightActiveLine: true,
+              }}
+            />
+            {children}
+          </div>
+        )}
+        {viewMode === 'reading' && (
+          <div className="preview-scroll-area">
+            {Object.keys(parsedData.data).length > 0 && (
+              <div className="frontmatter-display">
+                <pre>{JSON.stringify(parsedData.data, null, 2)}</pre>
+              </div>
+            )}
+            <div 
+              className="markdown-preview" 
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                const link = target.closest('a');
+                if (link) {
+                  const href = link.getAttribute('href');
+                  const internalHref = link.getAttribute('data-href');
+                  
+                  if (internalHref && onNavigate) {
+                    e.preventDefault();
+                    onNavigate(internalHref);
+                  } else if (href && !href.startsWith('http') && !href.startsWith('data:') && !href.startsWith('tauri:') && onNavigate) {
+                    e.preventDefault();
+                    onNavigate(href);
+                  } else if (href && href.startsWith('http')) {
+                    e.preventDefault();
+                    import('@tauri-apps/plugin-opener').then(module => {
+                      module.openUrl(href);
+                    }).catch(err => {
+                      console.error("Failed to load plugin-opener:", err);
+                    });
+                  }
                 }
-              }
-            ]),
-            ...(settings.wordWrap ? [EditorView.lineWrapping] : [])
-          ]}
-          onChange={handleChange}
-          onCreateEditor={handleCreateEditor}
-          onUpdate={handleUpdate}
-          basicSetup={{
-            lineNumbers: settings.lineNumbers,
-            foldGutter: true,
-            highlightActiveLine: true,
-          }}
-        />
-        {children}
+              }}
+              dangerouslySetInnerHTML={{ 
+                __html: marked.parse(
+                  parsedData.content.replace(/\[\[([^\]]+)\]\]/g, '<a href="#$1" class="internal-link" data-href="$1">$1</a>'), 
+                  getMarkedOptions(filePath)
+                ) as string 
+              }} 
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -13,7 +13,7 @@
 }
 
 .sidebar-header {
-  padding: 6px 16px;
+  padding: 3px 16px;
   border-bottom: 1px solid var(--divider-color);
   display: flex;
   justify-content: space-between;
@@ -22,7 +22,7 @@
 
 .sidebar-title {
   font-weight: 600;
-  font-size: 0.85em;
+  font-size: 0.75em;
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.05em;
