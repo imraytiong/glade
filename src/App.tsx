@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
-import { FolderOpen, Settings, FilePlus, FolderPlus } from 'lucide-react';
+import { FolderOpen, Settings, FilePlus, FolderPlus, PanelLeft, Files, List } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
@@ -25,6 +25,7 @@ function App() {
   });
   
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [sidebarView, setSidebarView] = useState<'explorer' | 'outline'>('explorer');
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   
@@ -516,36 +517,61 @@ function App() {
           )}
         </div>
       )}
+      {!isZenMode && (
+        <div className="ribbon">
+          <div className="ribbon-top">
+            <button className="icon-btn" onClick={() => setIsSidebarOpen(prev => !prev)} title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}>
+              <PanelLeft size={20} />
+            </button>
+            <button className={`icon-btn ${sidebarView === 'explorer' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
+              if (sidebarView === 'explorer' && isSidebarOpen) setIsSidebarOpen(false);
+              else { setSidebarView('explorer'); setIsSidebarOpen(true); }
+            }} title="Files">
+              <Files size={20} />
+            </button>
+            <button className={`icon-btn ${sidebarView === 'outline' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
+              if (sidebarView === 'outline' && isSidebarOpen) setIsSidebarOpen(false);
+              else { setSidebarView('outline'); setIsSidebarOpen(true); }
+            }} title="Outline">
+              <List size={20} />
+            </button>
+          </div>
+          <div className="ribbon-bottom">
+            <button className="icon-btn" onClick={() => setIsSettingsOpen(true)} title="Settings">
+              <Settings size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {isSidebarOpen && !isZenMode && (
         <div className="sidebar" style={{ position: 'relative' }}>
-          <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="sidebar-title">Glade</span>
+          {/* Header intentionally left for future tool-specific views, branding removed */}
+          <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '38px' }}>
           </div>
         
         <div className="sidebar-content">
           {vaultPath ? (
             <>
-              <FileExplorer 
-                nodes={fileTree} 
-                activeFilePath={activeFile?.path || null} 
-                onFileSelect={handleOpenFile} 
-                onRename={handleRenameFile}
-                onDelete={requestDelete}
-                onCreateFile={handleSidebarCreateFile}
-                onCreateFolder={handleSidebarCreateFolder}
-                onMove={handleMoveFile}
-                onDuplicate={handleDuplicateFile}
-              />
-              <div className="empty-space-actions">
-                <div className="empty-actions-container">
-                  <button className="icon-btn" onClick={() => handleSidebarCreateFile(vaultPath)} title="New File in Vault" style={{ padding: '4px' }}>
-                    <FilePlus size={14} />
-                  </button>
-                  <button className="icon-btn" onClick={() => handleSidebarCreateFolder(vaultPath)} title="New Folder in Vault" style={{ padding: '4px' }}>
-                    <FolderPlus size={14} />
-                  </button>
-                </div>
-              </div>
+              {sidebarView === 'explorer' && (
+                <FileExplorer 
+                  nodes={fileTree} 
+                  activeFilePath={activeFile?.path || null} 
+                  onFileSelect={handleOpenFile} 
+                  onRename={handleRenameFile}
+                  onDelete={requestDelete}
+                  onCreateFile={handleSidebarCreateFile}
+                  onCreateFolder={handleSidebarCreateFolder}
+                  onMove={handleMoveFile}
+                  onDuplicate={handleDuplicateFile}
+                />
+              )}
+              {sidebarView === 'outline' && (
+                <TableOfContents 
+                  content={activeFileContent?.content || ''} 
+                  onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
+                />
+              )}
             </>
           ) : (
             <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>
@@ -555,12 +581,19 @@ function App() {
         </div>
         
         <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '3px 16px', gap: '8px' }}>
-          <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FolderOpen size={16} />
-          </button>
-          <button className="icon-btn" onClick={() => setIsSettingsOpen(true)} title="Settings" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Settings size={16} />
-          </button>
+          {sidebarView === 'explorer' && vaultPath && (
+            <>
+              <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FolderOpen size={16} />
+              </button>
+              <button className="icon-btn" onClick={() => handleSidebarCreateFile(vaultPath)} title="New File" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FilePlus size={16} />
+              </button>
+              <button className="icon-btn" onClick={() => handleSidebarCreateFolder(vaultPath)} title="New Folder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FolderPlus size={16} />
+              </button>
+            </>
+          )}
         </div>
       </div>
       )}
@@ -580,8 +613,6 @@ function App() {
                 activeFileIndex={activeFileIndex} 
                 onTabClick={setActiveFileIndex}
                 onTabClose={handleTabClose}
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                 onRename={handleRenameFile}
               />
             )}
@@ -616,12 +647,6 @@ function App() {
                         />
                       </Editor>
                     </div>
-                    {!isZenMode && (
-                      <TableOfContents 
-                        content={activeFileContent.content} 
-                        onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
-                      />
-                    )}
                   </div>
                 ) : (
                   <div className="loading-editor" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-faint)' }}>Loading...</div>

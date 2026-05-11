@@ -8,12 +8,10 @@ interface TabBarProps {
   activeFileIndex: number;
   onTabClick: (index: number) => void;
   onTabClose: (e: React.MouseEvent, index: number) => void;
-  isSidebarOpen: boolean;
-  onToggleSidebar: () => void;
   onRename?: (oldPath: string, newName: string) => void;
 }
 
-const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick, onTabClose, isSidebarOpen, onToggleSidebar, onRename }) => {
+const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick, onTabClose, onRename }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
@@ -64,13 +62,6 @@ const TabBar: React.FC<TabBarProps> = ({ openFiles, activeFileIndex, onTabClick,
 
   return (
     <div className="tab-bar-container">
-      <button 
-        className="sidebar-toggle-btn" 
-        onClick={onToggleSidebar}
-        title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-      >
-        {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-      </button>
       <div 
         className="tab-bar" 
         ref={scrollRef}

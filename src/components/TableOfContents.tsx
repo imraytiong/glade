@@ -22,7 +22,18 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onNavigateHe
     return items;
   }, [content]);
 
-  if (headings.length === 0) return null;
+  if (headings.length === 0) {
+    return (
+      <div className="table-of-contents empty">
+        <div className="toc-header">
+          <h3 className="toc-title">Outline</h3>
+        </div>
+        <div className="toc-content" style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>
+          No headings found in document.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="table-of-contents">

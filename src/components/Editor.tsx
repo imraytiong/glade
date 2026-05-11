@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage, insertNewlineContinueMarkup, deleteMarkupBackward } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { EditorView, ViewUpdate, keymap } from '@codemirror/view';
+import { EditorView, ViewUpdate, keymap, drawSelection } from '@codemirror/view';
+import { history, historyKeymap, defaultKeymap, standardKeymap } from '@codemirror/commands';
 import { autocompletion, CompletionContext, CompletionResult, closeBrackets } from '@codemirror/autocomplete';
 import { format, addDays, subDays } from 'date-fns';
 import './Editor.css';
@@ -217,7 +218,7 @@ const dropHandler = EditorView.domEventHandlers({
 });
 
 const typewriterScroll = EditorState.transactionExtender.of((tr) => {
-  if (tr.selection || tr.docChanged) {
+  if (tr.docChanged || (tr.selection && tr.newSelection.main.empty)) {
     return {
       effects: EditorView.scrollIntoView(tr.newSelection.main.head, { y: 'center' })
     };
@@ -625,8 +626,8 @@ const gladeTheme = EditorView.theme({
     borderLeftColor: "var(--text-normal)",
     borderLeftWidth: "2px",
   },
-  "&.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "var(--background-modifier-active-hover)",
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+    backgroundColor: "var(--text-selection) !important",
   },
   ".cm-gutters": {
     backgroundColor: "var(--background-primary)",
@@ -638,7 +639,7 @@ const gladeTheme = EditorView.theme({
     color: "var(--text-normal)",
   },
   ".cm-activeLine": {
-    backgroundColor: "var(--background-modifier-hover)",
+    backgroundColor: "transparent",
   },
   ".cm-line": {
     padding: "0",
@@ -1004,9 +1005,14 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
                 linkHoverTooltip,
                 linkClickHandler,
                 closeBrackets(),
+                drawSelection(),
+                history(),
                 search({ top: true }),
                 autocompletion({ override: [linkCompletionSource, macroCompletionSource] }),
                 keymap.of([
+                  ...defaultKeymap,
+                  ...standardKeymap,
+                  ...historyKeymap,
                   ...searchKeymap,
                   { key: "Enter", run: insertNewlineContinueMarkup },
                   { key: "Backspace", run: deleteMarkupBackward },

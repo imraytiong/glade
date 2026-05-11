@@ -24,6 +24,7 @@
   --text-normal: #1e293b; /* Very dark slate, almost black */
   --text-muted: #64748b;
   --text-faint: #94a3b8;
+  --text-selection: rgba(125, 80, 255, 0.2);
   
   --interactive-accent: #7d50ff; /* Purple accent like Obsidian */
   --interactive-accent-hover: #6741d9;
@@ -46,6 +47,7 @@
   --text-normal: #f8fafc;
   --text-muted: #94a3b8;
   --text-faint: #64748b;
+  --text-selection: rgba(139, 92, 246, 0.3);
   
   --interactive-accent: #8b5cf6;
   --interactive-accent-hover: #a78bfa;

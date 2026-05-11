@@ -222,6 +222,6 @@
   padding-bottom: 50vh;
 }
 
-.cm-editor, .cm-scroller, .cm-content, .editor-scroll-area {
+.cm-editor, .cm-scroller, .editor-scroll-area {
   background-color: var(--background-primary) !important;
 }
