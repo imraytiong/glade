@@ -5,6 +5,8 @@ export interface Settings {
   lineNumbers: boolean;
   showBacklinks: boolean;
   typewriterMode: boolean;
+  theme: 'system' | 'light' | 'dark';
+  fontFamily: 'sans' | 'serif' | 'monospace';
   hotkeys: Record<string, string>;
 }
 
@@ -13,6 +15,8 @@ export const defaultSettings: Settings = {
   lineNumbers: false,
   showBacklinks: true,
   typewriterMode: false,
+  theme: 'system',
+  fontFamily: 'sans',
   hotkeys: {
     "file.search": "Cmd+F",
     "command.palette": "Cmd+P",
@@ -53,6 +57,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('glade_settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    const applyTheme = () => {
+      let activeTheme = settings.theme;
+      if (activeTheme === 'system') {
+        activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', activeTheme);
+    };
+
+    applyTheme();
+
+    if (settings.theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => applyTheme();
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
+  }, [settings.theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font', settings.fontFamily);
+  }, [settings.fontFamily]);
 
   const updateSettings = (newSettings: Partial<Settings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));

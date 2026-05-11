@@ -1,5 +1,19 @@
+/* Base Typography Values */
 :root {
-  /* Colors */
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-monospace: "SFMono-Regular", Consolas, "Roboto Mono", "Droid Sans Mono", "Liberation Mono", Menlo, Courier, monospace;
+}
+
+:root[data-font="serif"] {
+  --font-text: "Georgia", "Times New Roman", serif;
+}
+
+:root[data-font="monospace"] {
+  --font-text: "SFMono-Regular", Consolas, "Roboto Mono", "Droid Sans Mono", "Liberation Mono", Menlo, Courier, monospace;
+}
+
+:root, :root[data-theme="light"] {
+  /* Light Theme Colors */
   --background-primary: #ffffff; /* Main editor background */
   --background-secondary: #f4f4f5; /* Sidebar background */
   --background-modifier-hover: rgba(0, 0, 0, 0.04);
@@ -18,8 +32,26 @@
   --scrollbar-thumb-hover-bg: rgba(0, 0, 0, 0.3);
 
   --divider-color: rgba(0, 0, 0, 0.15);
+}
 
-  /* Typography */
-  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-monospace: "SFMono-Regular", Consolas, "Roboto Mono", "Droid Sans Mono", "Liberation Mono", Menlo, Courier, monospace;
+:root[data-theme="dark"] {
+  /* Dark Theme Colors */
+  --background-primary: #0f172a;
+  --background-secondary: #1e293b;
+  --background-modifier-hover: rgba(255, 255, 255, 0.04);
+  --background-modifier-active: rgba(255, 255, 255, 0.08);
+  --background-modifier-active-hover: rgba(255, 255, 255, 0.12);
+  --background-modifier-border: rgba(255, 255, 255, 0.1);
+  
+  --text-normal: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  
+  --interactive-accent: #8b5cf6;
+  --interactive-accent-hover: #a78bfa;
+  
+  --scrollbar-thumb-bg: rgba(255, 255, 255, 0.2);
+  --scrollbar-thumb-hover-bg: rgba(255, 255, 255, 0.3);
+
+  --divider-color: rgba(255, 255, 255, 0.15);
 }

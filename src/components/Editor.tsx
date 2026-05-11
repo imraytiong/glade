@@ -647,7 +647,7 @@ const gladeTheme = EditorView.theme({
     color: "var(--text-error, #f87171) !important",
     textDecoration: "underline wavy var(--text-error, #f87171) !important"
   }
-}, { dark: false });
+});
 
 // Markdown specific syntax highlighting to make it look like a rich document
 const markdownHighlighting = HighlightStyle.define([
@@ -678,6 +678,9 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
   const { settings } = useSettings();
   const [content, setContent] = useState(initialContent);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
+  
+  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const dynamicTheme = EditorView.theme({}, { dark: isDark });
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -991,6 +994,7 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
               extensions={[
                 markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
                 gladeTheme,
+                dynamicTheme,
                 syntaxHighlighting(markdownHighlighting),
                 checkboxInteraction,
                 pasteHandler,

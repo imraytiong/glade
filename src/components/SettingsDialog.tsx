@@ -34,6 +34,30 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
         </div>
         <div style={{ padding: '16px' }}>
           <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px' }}>Theme</span>
+            <select 
+              value={settings.theme} 
+              onChange={e => updateSettings({ theme: e.target.value as any })}
+              style={{ background: 'var(--background-secondary)', color: 'var(--text-normal)', border: '1px solid var(--background-modifier-border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              <option value="system">System Default</option>
+              <option value="light">Light Mode</option>
+              <option value="dark">Dark Mode</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px' }}>Font Style</span>
+            <select 
+              value={settings.fontFamily} 
+              onChange={e => updateSettings({ fontFamily: e.target.value as any })}
+              style={{ background: 'var(--background-secondary)', color: 'var(--text-normal)', border: '1px solid var(--background-modifier-border)', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              <option value="sans">Sans-Serif</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '14px' }}>Show Backlinks Pane</span>
             <input 
               type="checkbox" 
