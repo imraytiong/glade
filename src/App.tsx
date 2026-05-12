@@ -613,6 +613,10 @@ function App() {
         {!vaultPath ? (
           <div className="empty-state">
             <h2>Welcome to Glade</h2>
+            <div style={{ background: 'var(--bg-modifier-error, rgba(255, 0, 0, 0.1))', color: 'var(--text-error, #ff4444)', padding: '12px', borderRadius: '8px', marginBottom: '24px', maxWidth: '400px', fontSize: '13px', border: '1px solid var(--text-error, #ff4444)' }}>
+              <strong>Extreme Alpha Warning</strong><br/>
+              This is an early alpha release (0.0.1-alpha.1) and is not ready for production use. Please make a copy of your valued markdown vaults before opening them with Glade.
+            </div>
             <p style={{ marginBottom: '24px' }}>Open a folder to start your knowledge base.</p>
             <button className="btn" onClick={handleOpenVault}>Open Vault</button>
           </div>
