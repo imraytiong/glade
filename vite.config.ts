@@ -36,11 +36,13 @@ export default defineConfig(async () => ({
     exclude: ['e2e/**', 'node_modules/**'], // Exclude playwright tests
   },
   build: {
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'lucide-react'],
           codemirror: ['@codemirror/state', '@codemirror/view', '@codemirror/language', '@codemirror/commands', '@lezer/highlight', '@lezer/markdown'],
+          milkdown: ['@milkdown/core', '@milkdown/react', '@milkdown/plugin-prism', '@milkdown/plugin-listener', '@prosemirror-adapter/react'],
         }
       }
     }

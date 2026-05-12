@@ -7,6 +7,10 @@ import { HoverPreview } from './HoverPreview';
 import 'prismjs/themes/prism-tomorrow.css';
 import './Editor.css';
 
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { copyFile, mkdir } from '@tauri-apps/plugin-fs';
+import { basename, dirname } from '@tauri-apps/api/path';
+
 export interface EditorHandle {
   insertLink: (file: { name: string, path: string }) => void;
   scrollToHeader: (hash: string) => void;
@@ -21,15 +25,14 @@ const MilkdownInner = forwardRef<EditorHandle, EditorProps>((props, ref) => {
     let isMounted = true;
     let unlistenFn: (() => void) | undefined;
     
-    import('@tauri-apps/api/webview').then(({ getCurrentWebview }) => {
-      try {
-        const webview = getCurrentWebview();
-        webview.onDragDropEvent((event) => {
-          if (event.payload.type === 'drop') {
-            const { paths, position } = event.payload;
-            if (paths && paths.length > 0) {
-              const editor = get();
-              if (!editor) return;
+    try {
+      const webview = getCurrentWebview();
+      webview.onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          const { paths, position } = event.payload;
+          if (paths && paths.length > 0) {
+            const editor = get();
+            if (!editor) return;
 
             editor.action(async (ctx) => {
               const view = ctx.get(editorViewCtx);
@@ -38,9 +41,6 @@ const MilkdownInner = forwardRef<EditorHandle, EditorProps>((props, ref) => {
               const posAt = view.posAtCoords({ left: logicalX, top: logicalY });
               const pos = posAt ? posAt.pos : view.state.selection.from;
               
-              const { copyFile, mkdir } = await import('@tauri-apps/plugin-fs');
-              const { basename, dirname } = await import('@tauri-apps/api/path');
-
               // To avoid inserting multiple texts at the same position, we keep track of the insertion offset
               let insertPos = pos;
 
@@ -112,12 +112,9 @@ const MilkdownInner = forwardRef<EditorHandle, EditorProps>((props, ref) => {
       }).catch(err => {
         console.warn("Failed to attach drag and drop event (likely not running in Tauri):", err);
       });
-      } catch (err) {
-        console.warn("Failed to get current webview (likely not running in Tauri):", err);
-      }
-    }).catch(err => {
-      console.warn("Failed to load Tauri webview API (likely not running in Tauri):", err);
-    });
+    } catch (err) {
+      console.warn("Failed to get current webview (likely not running in Tauri):", err);
+    }
 
     return () => {
       isMounted = false;
