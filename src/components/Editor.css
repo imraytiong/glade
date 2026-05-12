@@ -225,3 +225,11 @@
 .cm-editor, .cm-scroller, .editor-scroll-area {
   background-color: var(--background-primary) !important;
 }
+
+.cm-hidden-markup {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}

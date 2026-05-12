@@ -1,0 +1,6 @@
+# WYSIWYG Tables
+
+| Col 1 | Col 2 |
+|---|---|
+| A | B |
+| C | D |

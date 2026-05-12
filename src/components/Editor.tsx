@@ -28,7 +28,7 @@ interface EditorProps {
 
 import { useSettings } from '../utils/settings';
 
-import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting, syntaxTree, Language } from '@codemirror/language';
 // Imports moved or consolidated
 import { tags as t } from '@lezer/highlight';
 import { Decoration, DecorationSet, WidgetType } from "@codemirror/view";
@@ -43,6 +43,11 @@ import 'prismjs/components/prism-css';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-bash';
 import mermaid from 'mermaid';
+
+const customMarkdownParser = markdownLanguage.parser.configure({
+  remove: ["SetextHeading"]
+});
+const customMarkdownLanguage = new Language(markdownLanguage.data, customMarkdownParser, markdownLanguage.extensions);
 import { search, searchKeymap } from '@codemirror/search';
 import { Code, Edit2, BookOpen } from 'lucide-react';
 
@@ -287,43 +292,292 @@ class HrWidget extends WidgetType {
   }
 }
 
-class TableWidget extends WidgetType {
-  constructor(readonly text: string) { super(); }
-  eq(other: TableWidget) { return other.text === this.text; }
-  toDOM() {
+class CodeLanguageWidget extends WidgetType {
+  constructor(readonly lang: string, readonly pos: number) { super(); }
+  eq(other: CodeLanguageWidget) { return other.lang === this.lang && other.pos === this.pos; }
+  ignoreEvent(event: Event) { 
+     // Don't ignore change events, but do ignore clicks so they don't focus the editor behind it
+     if (event.type === 'change' || event.type === 'mousedown') return false;
+     return true; 
+  }
+  toDOM(view: EditorView) {
     const wrap = document.createElement("div");
-    wrap.style.overflowX = "auto";
-    wrap.style.margin = "16px 0";
-    const table = document.createElement("table");
-    table.className = "cm-table";
+    wrap.className = "cm-code-language-selector";
+    wrap.style.display = "flex";
+    wrap.style.justifyContent = "flex-end";
+    wrap.style.padding = "4px 8px";
+    wrap.style.backgroundColor = "var(--background-modifier-hover)";
+    wrap.style.borderTopLeftRadius = "4px";
+    wrap.style.borderTopRightRadius = "4px";
+    wrap.style.borderBottom = "1px solid var(--background-modifier-border)";
+    wrap.style.userSelect = "none";
     
-    const lines = this.text.trim().split('\n');
-    let html = '';
-    lines.forEach((line, i) => {
-      if (i === 1 && line.match(/^[-|: ]+$/)) return;
-      const isHeader = i === 0;
-      const tag = isHeader ? 'th' : 'td';
-      const cells = line.replace(/^\||\|$/g, '').split('|');
-      const rowHtml = cells.map(c => {
-        return `<${tag}>${c.trim()}</${tag}>`;
-      }).join('');
-      html += `<tr>${rowHtml}</tr>`;
+    const select = document.createElement("select");
+    select.className = "cm-code-lang-select";
+    select.style.background = "var(--background-primary)";
+    select.style.color = "var(--text-normal)";
+    select.style.border = "1px solid var(--background-modifier-border)";
+    select.style.borderRadius = "4px";
+    select.style.padding = "2px 8px";
+    select.style.fontSize = "12px";
+    select.style.cursor = "pointer";
+    select.style.outline = "none";
+    
+    const options = ["auto", "javascript", "typescript", "python", "json", "bash", "html", "css", "markdown", "rust", "go", "java", "c", "cpp"];
+    options.forEach(opt => {
+      const option = document.createElement("option");
+      option.value = opt;
+      option.text = opt.charAt(0).toUpperCase() + opt.slice(1);
+      if (opt === this.lang.toLowerCase()) option.selected = true;
+      select.appendChild(option);
     });
-    table.innerHTML = html;
-    wrap.appendChild(table);
+    
+    // We add an explicit event listener instead of onchange for better compatibility with CodeMirror's event bubbling
+    select.addEventListener('change', (e) => {
+      const newLang = (e.target as HTMLSelectElement).value;
+      const line = view.state.doc.lineAt(this.pos);
+      const match = line.text.match(/^(\s*```+)\s*(.*)$/);
+      if (match) {
+        const fenceLen = match[1].length;
+        view.dispatch({
+          changes: { from: line.from + fenceLen, to: line.to, insert: newLang === 'auto' ? '' : newLang }
+        });
+      }
+    });
+
+    // Prevent mousedown from propagating to the editor so the dropdown opens properly
+    select.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+    
+    wrap.appendChild(select);
     return wrap;
   }
 }
 
-const hideMarkDeco = Decoration.replace({});
+class TableWidget extends WidgetType {
+  constructor(readonly text: string, readonly pos: number) { super(); }
+  eq(other: TableWidget) { return other.text === this.text && other.pos === this.pos; }
+  ignoreEvent(event: Event) { 
+    return true; // Let the widget handle its own DOM events
+  }
+  toDOM(view: EditorView) {
+    const wrap = document.createElement("div");
+    wrap.style.overflowX = "auto";
+    wrap.style.margin = "16px 0";
+    wrap.style.position = "relative";
+    wrap.style.border = "1px solid var(--background-modifier-border)";
+    wrap.style.borderRadius = "8px";
+    wrap.style.padding = "8px";
+    wrap.style.backgroundColor = "var(--background-primary)";
+    
+    const table = document.createElement("table");
+    table.className = "cm-table";
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    
+    let lines = this.text.trim().split('\n');
+    if (lines.length < 2) {
+       lines = ["| Header |", "|---|"];
+    }
+    const parseRow = (line: string) => line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    let header = parseRow(lines[0]);
+    let alignments = parseRow(lines[1]);
+    let rows = lines.slice(2).map(parseRow);
+    
+    // Ensure all rows have same length as header
+    rows = rows.map(r => {
+      while (r.length < header.length) r.push('');
+      return r.slice(0, header.length);
+    });
+
+    const serializeAndDispatch = () => {
+      let newText = `| ${header.join(' | ')} |\n| ${alignments.join(' | ')} |`;
+      if (rows.length > 0) {
+        newText += '\n' + rows.map(r => `| ${r.join(' | ')} |`).join('\n');
+      }
+      view.dispatch({
+        changes: { from: this.pos, to: this.pos + this.text.length, insert: newText }
+      });
+    };
+
+    const render = () => {
+      table.innerHTML = '';
+      
+      const thead = document.createElement('thead');
+      const trHead = document.createElement('tr');
+      header.forEach((cell, i) => {
+        const th = document.createElement('th');
+        th.contentEditable = "true";
+        th.innerText = cell;
+        th.style.border = "1px solid var(--background-modifier-border)";
+        th.style.padding = "6px 12px";
+        th.style.background = "var(--background-secondary)";
+        th.addEventListener('blur', (e) => {
+          if (header[i] !== th.innerText) {
+             header[i] = th.innerText.replace(/\n/g, ' ');
+             serializeAndDispatch();
+          }
+        });
+        th.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); th.blur(); }
+        });
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+      table.appendChild(thead);
+      
+      const tbody = document.createElement('tbody');
+      rows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        row.forEach((cell, colIndex) => {
+          const td = document.createElement('td');
+          td.contentEditable = "true";
+          td.innerText = cell;
+          td.style.border = "1px solid var(--background-modifier-border)";
+          td.style.padding = "6px 12px";
+          td.addEventListener('blur', (e) => {
+            if (rows[rowIndex][colIndex] !== td.innerText) {
+               rows[rowIndex][colIndex] = td.innerText.replace(/\n/g, ' ');
+               serializeAndDispatch();
+            }
+          });
+          td.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); td.blur(); }
+          });
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+    };
+    
+    render();
+    wrap.appendChild(table);
+    
+    const controls = document.createElement("div");
+    controls.style.display = "flex";
+    controls.style.gap = "8px";
+    controls.style.marginTop = "8px";
+    
+    const btnRow = document.createElement("button");
+    btnRow.innerText = "+ Row";
+    btnRow.className = "cm-table-btn";
+    btnRow.style.fontSize = "12px";
+    btnRow.style.padding = "4px 8px";
+    btnRow.style.cursor = "pointer";
+    btnRow.onclick = (e) => {
+      e.preventDefault();
+      rows.push(new Array(header.length).fill(''));
+      serializeAndDispatch();
+    };
+    
+    const btnCol = document.createElement("button");
+    btnCol.innerText = "+ Col";
+    btnCol.className = "cm-table-btn";
+    btnCol.style.fontSize = "12px";
+    btnCol.style.padding = "4px 8px";
+    btnCol.style.cursor = "pointer";
+    btnCol.onclick = (e) => {
+      e.preventDefault();
+      header.push('Header');
+      alignments.push('---');
+      rows.forEach(r => r.push(''));
+      serializeAndDispatch();
+    };
+    
+    controls.appendChild(btnRow);
+    controls.appendChild(btnCol);
+    wrap.appendChild(controls);
+    
+    return wrap;
+  }
+}
+
+class HiddenMarkupWidget extends WidgetType {
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-hidden-markup";
+    return el;
+  }
+}
+
+class EscapeWidget extends WidgetType {
+  constructor(readonly char: string) { super(); }
+  toDOM() {
+    const span = document.createElement("span");
+    span.textContent = this.char;
+    return span;
+  }
+}
+
+const hideMarkDeco = Decoration.replace({ widget: new HiddenMarkupWidget() });
+
+const disableFormattingInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  // Always escape inline formatting triggers immediately anywhere
+  if (['*', '_', '~', '`'].includes(text)) {
+    view.dispatch({
+      changes: { from, to, insert: `\\${text}` },
+      selection: { anchor: from + 2 }
+    });
+    return true;
+  }
+
+  // Escape block formatting triggers immediately if they are typed at the start of a line.
+  // We only need to escape the very first character to break the block formatting parser.
+  if (['#', '>'].includes(text)) {
+    const line = view.state.doc.lineAt(from);
+    const linePrefix = view.state.sliceDoc(line.from, from);
+    
+    // Only escape if it's the very first character of the line (ignoring leading whitespace)
+    if (linePrefix.trim() === '') {
+      view.dispatch({
+        changes: { from, to, insert: `\\${text}` },
+        selection: { anchor: from + 2 }
+      });
+      return true;
+    }
+  }
+
+  // Escape ordered lists by escaping the dot immediately
+  if (text === '.') {
+    const line = view.state.doc.lineAt(from);
+    const linePrefix = view.state.sliceDoc(line.from, from);
+    if (/^\d+$/.test(linePrefix)) {
+      view.dispatch({
+        changes: { from, to, insert: `\\.` },
+        selection: { anchor: from + 2 }
+      });
+      return true;
+    }
+  }
+
+  return false;
+});
+
 const codeBlockLineDeco = Decoration.line({
   attributes: { class: "cm-codeblock-line" }
 });
 const danglingLinkDeco = Decoration.mark({ class: "cm-link-dangling" });
 
-import { EditorState, StateField } from '@codemirror/state';
+import { EditorState, StateEffect, StateField, RangeSetBuilder, Extension, Text, Transaction } from '@codemirror/state';
+
+export const toggleMarkupEffect = StateEffect.define<void>();
+
+export const exposeMarkupField = StateField.define<boolean>({
+  create() { return false; },
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(toggleMarkupEffect)) return !value;
+    }
+    return value;
+  }
+});
 
 const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>) => {
+  const exposeMarkup = state.field(exposeMarkupField, false);
+  if (exposeMarkup) return Decoration.none;
+
   const marks: {from: number, to: number, type: string, widget?: WidgetType}[] = [];
   const selection = state.selection.main;
   const activeLine = state.doc.lineAt(selection.head);
@@ -346,31 +600,24 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
         return false;
       }
 
-      const isActiveLine = node.from >= activeLine.from && node.from <= activeLine.to;
       const name = node.name;
       
       if (name === "Image") {
-        if (!isActiveLine) {
-          const text = state.doc.sliceString(node.from, node.to);
-          const match = text.match(/!\[(.*?)\]\((.*?)\)/);
-          if (match) {
-            marks.push({from: node.from, to: node.to, type: "replace", widget: new ImageWidget(match[2], match[1], filePath)});
-          }
+        const text = state.doc.sliceString(node.from, node.to);
+        const match = text.match(/!\[(.*?)\]\((.*?)\)/);
+        if (match) {
+          marks.push({from: node.from, to: node.to, type: "replace", widget: new ImageWidget(match[2], match[1], filePath)});
         }
         return false;
       } else if (name === "HorizontalRule") {
-        if (!isActiveLine) {
-          const startLine = state.doc.lineAt(node.from);
-          marks.push({from: startLine.from, to: startLine.to, type: "replace-block", widget: new HrWidget()});
-        }
+        const startLine = state.doc.lineAt(node.from);
+        marks.push({from: startLine.from, to: startLine.to, type: "replace-block", widget: new HrWidget()});
         return false;
       } else if (name === "Table") {
-        if (!isActiveLine) {
-          const text = state.doc.sliceString(node.from, node.to);
-          const startLine = state.doc.lineAt(node.from);
-          const endLine = state.doc.lineAt(node.to);
-          marks.push({from: startLine.from, to: endLine.to, type: "replace-block", widget: new TableWidget(text)});
-        }
+        const text = state.doc.sliceString(node.from, node.to);
+        const startLine = state.doc.lineAt(node.from);
+        const endLine = state.doc.lineAt(node.to);
+        marks.push({from: startLine.from, to: endLine.to, type: "replace-block", widget: new TableWidget(text, startLine.from)});
         return false;
       } else if (name === "FencedCode") {
         let pos = node.from;
@@ -379,62 +626,83 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
           marks.push({from: line.from, to: line.from, type: "line"});
           pos = line.to + 1;
         }
+        
+        const firstLine = state.doc.lineAt(node.from);
+        const match = firstLine.text.match(/^(\s*```+)\s*(.*)$/);
+        if (match) {
+            const lang = match[2].trim() || 'auto';
+            marks.push({
+               from: firstLine.to, 
+               to: firstLine.to, 
+               type: "widget-append", 
+               widget: new CodeLanguageWidget(lang, node.from)
+            });
+        }
       } else if (name === "TaskMarker") {
-        if (!isActiveLine) {
-          const text = state.doc.sliceString(node.from, node.to);
-          const isChecked = text.toLowerCase() === "[x]" || text.toLowerCase() === "[X]";
-          
-          const line = state.doc.lineAt(node.from);
-          let listMarkFrom = -1;
-          syntaxTree(state).iterate({
-            from: line.from,
-            to: node.from,
-            enter: (n) => {
-              if (n.name === "ListMark") listMarkFrom = n.from;
-            }
-          });
-
-          if (listMarkFrom !== -1) {
-            marks.push({from: listMarkFrom, to: node.to, type: "replace", widget: new CheckboxWidget(isChecked)});
+        const text = state.doc.sliceString(node.from, node.to);
+        const isChecked = text.toLowerCase() === "[x]" || text.toLowerCase() === "[X]";
+        
+        const line = state.doc.lineAt(node.from);
+        let listMarkFrom = -1;
+        syntaxTree(state).iterate({
+          from: line.from,
+          to: node.from,
+          enter: (n) => {
+            if (n.name === "ListMark") listMarkFrom = n.from;
           }
+        });
+
+        if (listMarkFrom !== -1) {
+          marks.push({from: listMarkFrom, to: node.to, type: "replace", widget: new CheckboxWidget(isChecked)});
         }
       } else if (name === "ListMark") {
-        if (!isActiveLine) {
-          const line = state.doc.lineAt(node.from);
-          let hasTask = false;
-          syntaxTree(state).iterate({
-            from: node.to,
-            to: line.to,
-            enter: (n) => {
-              if (n.name === "TaskMarker") hasTask = true;
-            }
-          });
+        const line = state.doc.lineAt(node.from);
+        let hasTask = false;
+        syntaxTree(state).iterate({
+          from: node.to,
+          to: line.to,
+          enter: (n) => {
+            if (n.name === "TaskMarker") hasTask = true;
+          }
+        });
 
-          if (!hasTask) {
-            const text = state.doc.sliceString(node.from, node.to);
-            if (/^[-*+]\s*$/.test(text)) {
-              marks.push({
-                from: node.from, 
-                to: node.to, 
-                type: "replace", 
-                widget: new BulletWidget(text.replace(/[-*+]/, "•"))
-              });
-            }
+        if (!hasTask) {
+          const text = state.doc.sliceString(node.from, node.to);
+          const nextChar = state.doc.sliceString(node.to, node.to + 1);
+          if (/^[-*+]\s*$/.test(text) && nextChar === ' ') {
+            marks.push({
+              from: node.from, 
+              to: node.to, 
+              type: "replace", 
+              widget: new BulletWidget(text.replace(/[-*+]/, "•"))
+            });
           }
         }
       }
 
-      if (isActiveLine) return;
-
-      if (
-        name === "HeaderMark" ||
+      let shouldHide = false;
+      if (name === "HeaderMark" || name === "QuoteMark") {
+        const nextChar = state.doc.sliceString(node.to, node.to + 1);
+        if (nextChar === ' ') {
+          shouldHide = true;
+        }
+      } else if (
         name === "EmphasisMark" ||
         name === "CodeMark" ||
-        name === "QuoteMark" ||
+        name === "CodeInfo" ||
         name === "LinkMark" ||
         (name === "URL" && node.node.parent?.name === "Link")
       ) {
-        marks.push({from: node.from, to: node.to, type: "hide"});
+        shouldHide = true;
+      }
+
+      if (shouldHide) {
+        // Do not hide the trailing space so the browser native caret has a text node to latch onto
+        const hideTo = node.to;
+        marks.push({from: node.from, to: hideTo, type: "hide"});
+      } else if (name === "Escape") {
+        const char = state.doc.sliceString(node.from + 1, node.to);
+        marks.push({from: node.from, to: node.to, type: "replace", widget: new EscapeWidget(char)});
       } else if (name === "Link") {
         const text = state.doc.sliceString(node.from, node.to);
         const match = text.match(/\[(.*?)\]\((.*?)\)/);
@@ -472,6 +740,8 @@ const buildDeco = (state: EditorState, filePath: string, validPaths: Set<string>
       return Decoration.replace({ widget: mark.widget }).range(mark.from, mark.to);
     } else if (mark.type === "replace-block" && mark.widget) {
       return Decoration.replace({ widget: mark.widget, block: true }).range(mark.from, mark.to);
+    } else if (mark.type === "widget-append" && mark.widget) {
+      return Decoration.widget({ widget: mark.widget, side: 1 }).range(mark.from);
     } else if (mark.type === "mark-dangling") {
       return danglingLinkDeco.range(mark.from, mark.to);
     }
@@ -593,7 +863,7 @@ const getLivePreviewField = (filePath: string, validPaths: Set<string>) => State
     return buildDeco(state, filePath, validPaths);
   },
   update(deco, tr) {
-    if (tr.docChanged || tr.selection) {
+    if (tr.docChanged || tr.selection || tr.effects.some(e => e.is(toggleMarkupEffect))) {
       return buildDeco(tr.state, filePath, validPaths);
     }
     return deco;
@@ -675,6 +945,121 @@ export interface EditorHandle {
   scrollToHeader: (hash: string) => void;
 }
 
+const handleBackspace = (view: EditorView) => {
+  const selection = view.state.selection.main;
+  const doc = view.state.doc;
+  const marks = ["**", "*", "~~", "_", "__", "`"];
+
+  if (!selection.empty) {
+    for (const mark of marks) {
+      const markLen = mark.length;
+      if (selection.from >= markLen && selection.to <= doc.length - markLen) {
+        const before = doc.sliceString(selection.from - markLen, selection.from);
+        const after = doc.sliceString(selection.to, selection.to + markLen);
+        if (before === mark && after === mark) {
+          view.dispatch({
+            changes: { from: selection.from - markLen, to: selection.to + markLen, insert: "" }
+          });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  for (const mark of marks) {
+    const markLen = mark.length;
+    // Case 1: Cursor is immediately after a single character inside marks: **a|**
+    if (selection.from >= markLen + 1 && selection.from <= doc.length - markLen) {
+      const beforeMark = doc.sliceString(selection.from - 1 - markLen, selection.from - 1);
+      const afterMark = doc.sliceString(selection.from, selection.from + markLen);
+      if (beforeMark === mark && afterMark === mark) {
+        view.dispatch({
+          changes: { from: selection.from - 1 - markLen, to: selection.from + markLen, insert: "" }
+        });
+        return true;
+      }
+    }
+    // Case 2: Cursor is between marks: **|** or **\u200B|**
+    if (selection.from >= markLen && selection.from <= doc.length - markLen) {
+      const beforeMark = doc.sliceString(selection.from - markLen, selection.from);
+      const afterMark = doc.sliceString(selection.from, selection.from + markLen);
+      if (beforeMark === mark && afterMark === mark) {
+        view.dispatch({
+          changes: { from: selection.from - markLen, to: selection.from + markLen, insert: "" }
+        });
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+const toggleInlineFormatting = (view: EditorView, mark: string) => {
+  const selection = view.state.selection.main;
+  const doc = view.state.doc;
+  const markLen = mark.length;
+  
+  if (selection.empty) {
+    // If the cursor is exactly before the ending mark, step OVER it to "get out" of the bolding
+    if (selection.from <= doc.length - markLen) {
+      const after = doc.sliceString(selection.to, selection.to + markLen);
+      if (after === mark) {
+        view.dispatch({
+          selection: { anchor: selection.to + markLen }
+        });
+        return true;
+      }
+    }
+  }
+
+  if (selection.from >= markLen && selection.to <= doc.length - markLen) {
+    const before = doc.sliceString(selection.from - markLen, selection.from);
+    const after = doc.sliceString(selection.to, selection.to + markLen);
+    
+    if (before === mark && after === mark) {
+      view.dispatch({
+        changes: [
+          { from: selection.from - markLen, to: selection.from, insert: "" },
+          { from: selection.to, to: selection.to + markLen, insert: "" }
+        ],
+        selection: { anchor: selection.from - markLen, head: selection.to - markLen }
+      });
+      return true;
+    }
+  }
+  
+  const text = doc.sliceString(selection.from, selection.to);
+  const insertText = text === "" ? "\u200B" : text;
+
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert: `${mark}${insertText}${mark}` },
+    selection: { anchor: selection.from + markLen, head: selection.from + markLen + insertText.length }
+  });
+  return true;
+};
+
+const toggleBlockFormatting = (view: EditorView, prefix: string) => {
+  const selection = view.state.selection.main;
+  const line = view.state.doc.lineAt(selection.from);
+  
+  let newText = line.text.replace(/^(#{1,6}\s+|- \[\s\]\s|- \[[xX]\]\s|[-*+]\s|\d+\.\s|> \s?)/, '');
+  
+  if (prefix !== '') {
+    const currentPrefixMatch = line.text.match(/^(#{1,6}\s+|- \[\s\]\s|- \[[xX]\]\s|[-*+]\s|\d+\.\s|> \s?)/);
+    if (!currentPrefixMatch || currentPrefixMatch[0] !== prefix) {
+      newText = prefix + newText;
+    }
+  }
+
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: newText },
+    selection: { anchor: Math.max(line.from, selection.from + (newText.length - line.text.length)) }
+  });
+  return true;
+};
+
 export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialContent, onSave, fileName, filePath, initialCursorPos, onCursorChange, allFiles, onNavigate, onCreateFile, onRename, children }, ref) => {
   const { settings } = useSettings();
   const [content, setContent] = useState(initialContent);
@@ -698,7 +1083,7 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
   }, [content]);
 
   useEffect(() => {
-    if (viewMode !== 'edit') {
+    if (viewMode === 'reading') {
       setTimeout(() => mermaid.run(), 100);
     }
   }, [content, viewMode]);
@@ -919,6 +1304,29 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
     };
   }, [allFiles]);
 
+  const slashCompletionSource = React.useCallback(async (context: CompletionContext): Promise<CompletionResult | null> => {
+    let word = context.matchBefore(/\/[a-zA-Z0-9]*/);
+    if (!word) return null;
+    if (word.from === word.to && !context.explicit) return null;
+
+    const options = [
+      { label: "/h1", detail: "Heading 1", type: "keyword", apply: "# " },
+      { label: "/h2", detail: "Heading 2", type: "keyword", apply: "## " },
+      { label: "/h3", detail: "Heading 3", type: "keyword", apply: "### " },
+      { label: "/bullet", detail: "Bulleted List", type: "keyword", apply: "- " },
+      { label: "/number", detail: "Numbered List", type: "keyword", apply: "1. " },
+      { label: "/todo", detail: "To-do List", type: "keyword", apply: "- [ ] " },
+      { label: "/quote", detail: "Blockquote", type: "keyword", apply: "> " },
+      { label: "/code", detail: "Code Block", type: "keyword", apply: "```\n\n```" },
+      { label: "/table", detail: "Table", type: "keyword", apply: "\n| Column 1 | Column 2 |\n| -------- | -------- |\n| Text     | Text     |\n" },
+    ];
+
+    return {
+      from: word.from,
+      options
+    };
+  }, []);
+
   const handleChange = (val: string) => {
     setContent(val);
     // Debounce save in a real app, but for MVP we can save on blur or with a short timeout.
@@ -993,7 +1401,8 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
               value={content}
               height="auto"
               extensions={[
-                markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [GFM] }),
+                exposeMarkupField,
+                markdown({ base: customMarkdownLanguage, codeLanguages: languages, extensions: [GFM] }),
                 gladeTheme,
                 dynamicTheme,
                 syntaxHighlighting(markdownHighlighting),
@@ -1001,21 +1410,46 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
                 pasteHandler,
                 dropHandler,
                 ...(settings.typewriterMode ? [typewriterScroll] : []),
-                ...(viewMode === 'rich' ? [livePreviewField] : []),
+                ...(viewMode === 'rich' ? [
+                  livePreviewField, 
+                  disableFormattingInputHandler,
+                  EditorView.atomicRanges.of(view => view.state.field(livePreviewField))
+                ] : []),
                 linkHoverTooltip,
                 linkClickHandler,
                 closeBrackets(),
                 drawSelection(),
                 history(),
                 search({ top: true }),
-                autocompletion({ override: [linkCompletionSource, macroCompletionSource] }),
+                autocompletion({ override: [linkCompletionSource, macroCompletionSource, slashCompletionSource] }),
                 keymap.of([
                   ...defaultKeymap,
                   ...standardKeymap,
                   ...historyKeymap,
                   ...searchKeymap,
                   { key: "Enter", run: insertNewlineContinueMarkup },
+                  { key: "Backspace", run: handleBackspace },
                   { key: "Backspace", run: deleteMarkupBackward },
+                  {
+                    key: "Mod-b",
+                    run: (view) => toggleInlineFormatting(view, "**")
+                  },
+                  {
+                    key: "Mod-i",
+                    run: (view) => toggleInlineFormatting(view, "*")
+                  },
+                  { key: "Mod-Shift-x", run: (view) => toggleInlineFormatting(view, "~~") },
+                  { key: "Alt-Shift-5", run: (view) => toggleInlineFormatting(view, "~~") },
+                  { key: "Mod-Alt-1", run: (view) => toggleBlockFormatting(view, "# ") },
+                  { key: "Mod-Alt-2", run: (view) => toggleBlockFormatting(view, "## ") },
+                  { key: "Mod-Alt-3", run: (view) => toggleBlockFormatting(view, "### ") },
+                  { key: "Mod-Alt-4", run: (view) => toggleBlockFormatting(view, "#### ") },
+                  { key: "Mod-Alt-5", run: (view) => toggleBlockFormatting(view, "##### ") },
+                  { key: "Mod-Alt-6", run: (view) => toggleBlockFormatting(view, "###### ") },
+                  { key: "Mod-Alt-0", run: (view) => toggleBlockFormatting(view, "") },
+                  { key: "Mod-Shift-7", run: (view) => toggleBlockFormatting(view, "1. ") },
+                  { key: "Mod-Shift-8", run: (view) => toggleBlockFormatting(view, "- ") },
+                  { key: "Mod-Shift-9", run: (view) => toggleBlockFormatting(view, "> ") },
                   {
                     key: "Mod-k",
                     run: (view) => {
@@ -1024,6 +1458,15 @@ export const Editor = React.forwardRef<EditorHandle, EditorProps>(({ initialCont
                       view.dispatch({
                         changes: { from: selection.from, to: selection.to, insert: `[${selectedText}]()` },
                         selection: { anchor: selection.from + selectedText.length + 3 } // position inside ()
+                      });
+                      return true;
+                    }
+                  },
+                  {
+                    key: "Mod-Alt-m",
+                    run: (view) => {
+                      view.dispatch({
+                        effects: toggleMarkupEffect.of()
                       });
                       return true;
                     }
