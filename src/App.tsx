@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
-import { FolderOpen, Settings, FilePlus, FolderPlus, PanelLeft, Files, List } from 'lucide-react';
+import { Settings, PanelLeft, Files, List } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
 import { useSettings } from './utils/settings';
-import FileExplorer from './components/FileExplorer';
+
 import Editor, { EditorHandle } from './components/Editor';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import CommandPalette from './components/CommandPalette';
 import BacklinksPane from './components/BacklinksPane';
-import TableOfContents from './components/TableOfContents';
+
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import Sidebar from './components/layout/Sidebar';
