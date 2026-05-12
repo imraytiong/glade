@@ -3,13 +3,15 @@
 </p>
 
 # Glade
-**Version:** 0.0.1-alpha.1
+**Version:** 0.0.1-alpha.2
 
 > [!CAUTION]
 > **Extreme Alpha Warning**
 > Glade is currently in an extreme early alpha state. It is not ready for production use. Anyone is free to try it out, but **using it against a valued vault or folder of markdown is highly discouraged for now**. Please make a copy of your files before opening them in Glade to prevent accidental data loss.
 
-Glade is a modern, sleek, and highly extensible Markdown knowledge base and IDE. Built with Tauri, React, and Milkdown, it provides a seamless WYSIWYG editing experience with distraction-free features and hotkey-driven commands.
+**Glade is an Agentic-Native Knowledge Base.**
+
+Built from the ground up to solve the clumsiness of bolt-on AI tools, Glade is an experimentation in creating a strictly local Personal Knowledge Management (PKM) system that treats a Multi-Agent System (MAS) as a core pillar. It brings together the best features of editors like Obsidian and Notion, but supercharges them with opinionated AI-native UX, the ability to connect your own local inference engines, and first-class support for interconnected cross-vault collections.
 
 ## Documentation
 
