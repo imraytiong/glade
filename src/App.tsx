@@ -15,7 +15,23 @@ import BacklinksPane from './components/BacklinksPane';
 import TableOfContents from './components/TableOfContents';
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
+import { FrontmatterEditor } from './components/FrontmatterEditor';
 import './App.css';
+
+function extractFrontmatter(content: string) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (match) {
+    return { frontmatter: match[1], body: match[2] };
+  }
+  return { frontmatter: null, body: content };
+}
+
+function combineFrontmatter(frontmatter: string | null, body: string) {
+  if (frontmatter !== null && frontmatter.trim() !== '') {
+    return `---\n${frontmatter}\n---\n${body}`;
+  }
+  return body;
+}
 
 function App() {
   const editorRef = useRef<EditorHandle>(null);
@@ -99,7 +115,9 @@ function App() {
     }
   }, [vaultPath, loadVaultFiles]);
 
-  const [activeFileContent, setActiveFileContent] = useState<{ path: string, content: string } | null>(null);
+  const [activeFileContent, setActiveFileContent] = useState<{ path: string, content: string, frontmatter: string | null } | null>(null);
+  const [activeHeading, setActiveHeading] = useState<string>('');
+  const [stats, setStats] = useState<{ wordCount: number, charCount: number, readingTime: number } | null>(null);
 
   // Load File Content when active tab changes
   useEffect(() => {
@@ -110,10 +128,11 @@ function App() {
         try {
           const content = await readTextFile(file.path);
           console.log("Loaded content length:", content.length);
-          setActiveFileContent({ path: file.path, content });
+          const { frontmatter, body } = extractFrontmatter(content);
+          setActiveFileContent({ path: file.path, content: body, frontmatter });
         } catch (err) {
           console.error('Failed to read active file', err);
-          setActiveFileContent({ path: file.path, content: `Error loading file: ${err}` });
+          setActiveFileContent({ path: file.path, content: `Error loading file: ${err}`, frontmatter: null });
         }
       } else {
         setActiveFileContent(null);
@@ -136,6 +155,7 @@ function App() {
       }
       setOpenFiles([]);
       setActiveFileIndex(-1);
+      setStats(null);
     }
   };
 
@@ -205,22 +225,37 @@ function App() {
     
     if (newOpenFiles.length === 0) {
       setActiveFileIndex(-1);
+      setStats(null);
     } else if (indexToClose <= activeFileIndex) {
       // If we closed a tab to the left of active, or the active tab itself
       setActiveFileIndex(Math.max(0, activeFileIndex - 1));
     }
   };
 
-  const handleSaveFile = async (content: string) => {
-    if (activeFileIndex >= 0 && activeFileIndex < openFiles.length) {
+  const handleSaveFile = async (newBody: string) => {
+    if (activeFileIndex >= 0 && activeFileIndex < openFiles.length && activeFileContent) {
       const activeFile = openFiles[activeFileIndex];
+      const newRaw = combineFrontmatter(activeFileContent.frontmatter, newBody);
       try {
-        await writeTextFile(activeFile.path, content);
-        // Do NOT setFileContent here because it's triggered by the Editor's own onChange,
-        // we just need to write it to disk. 
-        // Setting state here causes the cursor to jump in CodeMirror sometimes.
+        await writeTextFile(activeFile.path, newRaw);
+        // We don't update state here because Milkdown's internal state handles body changes.
+        // However, we should keep activeFileContent.content in sync for BacklinksPane.
+        setActiveFileContent(prev => prev ? { ...prev, content: newBody } : null);
       } catch (err) {
         console.error('Failed to save file', err);
+      }
+    }
+  };
+
+  const handleFrontmatterChange = async (newFrontmatter: string) => {
+    if (activeFileIndex >= 0 && activeFileIndex < openFiles.length && activeFileContent) {
+      const activeFile = openFiles[activeFileIndex];
+      const newRaw = combineFrontmatter(newFrontmatter, activeFileContent.content);
+      try {
+        await writeTextFile(activeFile.path, newRaw);
+        setActiveFileContent(prev => prev ? { ...prev, frontmatter: newFrontmatter } : null);
+      } catch (err) {
+        console.error('Failed to save frontmatter', err);
       }
     }
   };
@@ -262,6 +297,15 @@ function App() {
       id: 'editor.toggleLineNumbers',
       name: 'Toggle Line Numbers',
       action: () => updateSettings({ lineNumbers: !settings.lineNumbers }),
+    },
+    {
+      id: 'add-properties',
+      name: 'Add Properties (Frontmatter)',
+      action: () => {
+        if (activeFileContent && activeFileContent.frontmatter === null) {
+          handleFrontmatterChange('title: ' + (activeFile?.name.replace('.md', '') || 'New Page'));
+        }
+      },
     },
     {
       id: 'editor.toggleWordWrap',
@@ -567,10 +611,19 @@ function App() {
                 />
               )}
               {sidebarView === 'outline' && (
-                <TableOfContents 
-                  content={activeFileContent?.content || ''} 
-                  onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {activeFileContent && (
+                    <FrontmatterEditor 
+                      value={activeFileContent.frontmatter} 
+                      onChange={handleFrontmatterChange} 
+                    />
+                  )}
+                  <TableOfContents 
+                    content={activeFileContent?.content || ''} 
+                    activeHeadingId={activeHeading}
+                    onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
+                  />
+                </div>
               )}
             </>
           ) : (
@@ -624,8 +677,9 @@ function App() {
             ) : (
               <div className="editor-container">
                 {activeFileContent && activeFileContent.path === activeFile.path ? (
-                  <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', flex: 1, minHeight: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+
                       <Editor 
                         key={activeFileContent.path}
                         ref={editorRef}
@@ -633,12 +687,15 @@ function App() {
                         onSave={handleSaveFile} 
                         fileName={activeFile.name}
                         filePath={activeFile.path}
+                        workspaceRoot={vaultPath || undefined}
                         initialCursorPos={cursorPositions[activeFile.path]}
                         onCursorChange={(pos) => handleCursorChange(activeFile.path, pos)}
+                        onActiveHeadingChange={setActiveHeading}
                         allFiles={flattenFiles(fileTree)}
                         onNavigate={handleNavigate}
                         onCreateFile={handleCreateFile}
                         onRename={handleRenameFile}
+                        onStatsChange={setStats}
                       >
                         <BacklinksPane 
                           activeFilePath={activeFile.path} 
@@ -657,7 +714,7 @@ function App() {
             {!isZenMode && (
               <StatusBar 
                 activeFile={activeFile} 
-                content={activeFileContent && activeFileContent.path === activeFile?.path ? activeFileContent.content : null} 
+                stats={stats} 
               />
             )}
           </div>

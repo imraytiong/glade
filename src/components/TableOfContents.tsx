@@ -3,10 +3,11 @@ import './TableOfContents.css';
 
 interface TableOfContentsProps {
   content: string;
+  activeHeadingId?: string;
   onNavigateHeader: (hash: string) => void;
 }
 
-const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onNavigateHeader }) => {
+const TableOfContents: React.FC<TableOfContentsProps> = ({ content, activeHeadingId, onNavigateHeader }) => {
   const headings = useMemo(() => {
     // Only match markdown headings at the start of a line
     const regex = /^(#{1,6})\s+(.*)$/gm;
@@ -45,7 +46,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ content, onNavigateHe
           {headings.map((heading, i) => (
             <li 
               key={i} 
-              className={`toc-item toc-level-${heading.level}`} 
+              className={`toc-item toc-level-${heading.level} ${heading.id === activeHeadingId ? 'active' : ''}`} 
               onClick={() => onNavigateHeader(heading.id)}
               title={heading.text}
             >

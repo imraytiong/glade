@@ -111,3 +111,44 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Custom Glowing Drop Cursors */
+.prosemirror-dropcursor-block {
+  animation: glow-dropcursor 1.5s ease-in-out infinite alternate;
+  background-color: var(--interactive-accent) !important;
+  height: 3px !important;
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--interactive-accent), 0 0 12px var(--interactive-accent);
+}
+
+.prosemirror-dropcursor-inline {
+  animation: glow-dropcursor 1.5s ease-in-out infinite alternate;
+  background-color: var(--interactive-accent) !important;
+  width: 3px !important;
+  border-radius: 2px;
+  box-shadow: 0 0 8px var(--interactive-accent), 0 0 12px var(--interactive-accent);
+}
+
+@keyframes glow-dropcursor {
+  from {
+    opacity: 0.6;
+    box-shadow: 0 0 4px var(--interactive-accent);
+  }
+  to {
+    opacity: 1;
+    box-shadow: 0 0 10px var(--interactive-accent), 0 0 16px var(--interactive-accent);
+  }
+}
+
+/* Find and Replace Highlights */
+.ProseMirror-search-match {
+  background-color: rgba(255, 215, 0, 0.3);
+  border-radius: 2px;
+}
+
+.ProseMirror-active-search-match {
+  background-color: var(--interactive-accent);
+  color: white;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+}

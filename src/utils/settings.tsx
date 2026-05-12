@@ -18,7 +18,7 @@ export const defaultSettings: Settings = {
   theme: 'system',
   fontFamily: 'sans',
   hotkeys: {
-    "file.search": "Cmd+F",
+    "file.search": "Cmd+O",
     "command.palette": "Cmd+P",
     "app.toggleSidebar": "Cmd+\\",
     "app.closeTab": "Cmd+W",
@@ -27,7 +27,7 @@ export const defaultSettings: Settings = {
 
 export function mergeSettings(saved: Partial<Settings> | null): Settings {
   if (!saved) return defaultSettings;
-  return {
+  const merged = {
     ...defaultSettings,
     ...saved,
     hotkeys: {
@@ -35,6 +35,13 @@ export function mergeSettings(saved: Partial<Settings> | null): Settings {
       ...(saved.hotkeys || {})
     }
   };
+
+  // Migration to resolve Cmd+F collision with Find & Replace
+  if (merged.hotkeys['file.search'] === 'Cmd+F') {
+    merged.hotkeys['file.search'] = 'Cmd+O';
+  }
+
+  return merged;
 }
 
 interface SettingsContextType {

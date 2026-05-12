@@ -4,13 +4,10 @@ import './StatusBar.css';
 
 interface StatusBarProps {
   activeFile: FileNode | null;
-  content: string | null;
+  stats: { wordCount: number, charCount: number, readingTime: number } | null;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ activeFile, content }) => {
-  const wordCount = content ? content.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  const charCount = content ? content.length : 0;
-
+const StatusBar: React.FC<StatusBarProps> = ({ activeFile, stats }) => {
   return (
     <div className="status-bar">
       <div className="status-left">
@@ -23,10 +20,11 @@ const StatusBar: React.FC<StatusBarProps> = ({ activeFile, content }) => {
         )}
       </div>
       <div className="status-right">
-        {activeFile && (
+        {activeFile && stats && (
           <>
-            <span className="status-item">{wordCount} words</span>
-            <span className="status-item">{charCount} chars</span>
+            <span className="status-item">{stats.charCount} chars</span>
+            <span className="status-item">{stats.wordCount} words</span>
+            <span className="status-item">{Math.ceil(stats.readingTime)} min read</span>
           </>
         )}
       </div>

@@ -34,6 +34,10 @@ export class VaultIndexer {
     this.emit();
   }
 
+  public getFiles(): FileNode[] {
+    return this.allFiles;
+  }
+
   // Fully index a given list of files
   public async indexFiles(files: FileNode[]) {
     this.allFiles = files;

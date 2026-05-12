@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { X } from 'lucide-react';
 import { FileNode } from '../utils/fs';
 import './TabBar.css';
 
