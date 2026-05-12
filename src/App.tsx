@@ -15,7 +15,7 @@ import BacklinksPane from './components/BacklinksPane';
 import TableOfContents from './components/TableOfContents';
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
-import { FrontmatterEditor } from './components/FrontmatterEditor';
+import Sidebar from './components/layout/Sidebar';
 import './App.css';
 
 function extractFrontmatter(content: string) {
@@ -589,66 +589,24 @@ function App() {
       )}
 
       {isSidebarOpen && !isZenMode && (
-        <div className="sidebar" style={{ position: 'relative' }}>
-          {/* Header intentionally left for future tool-specific views, branding removed */}
-          <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '38px' }}>
-          </div>
-        
-        <div className="sidebar-content">
-          {vaultPath ? (
-            <>
-              {sidebarView === 'explorer' && (
-                <FileExplorer 
-                  nodes={fileTree} 
-                  activeFilePath={activeFile?.path || null} 
-                  onFileSelect={handleOpenFile} 
-                  onRename={handleRenameFile}
-                  onDelete={requestDelete}
-                  onCreateFile={handleSidebarCreateFile}
-                  onCreateFolder={handleSidebarCreateFolder}
-                  onMove={handleMoveFile}
-                  onDuplicate={handleDuplicateFile}
-                />
-              )}
-              {sidebarView === 'outline' && (
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {activeFileContent && (
-                    <FrontmatterEditor 
-                      value={activeFileContent.frontmatter} 
-                      onChange={handleFrontmatterChange} 
-                    />
-                  )}
-                  <TableOfContents 
-                    content={activeFileContent?.content || ''} 
-                    activeHeadingId={activeHeading}
-                    onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
-                  />
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '13px' }}>
-              No vault opened.
-            </div>
-          )}
-        </div>
-        
-        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '3px 16px', gap: '8px' }}>
-          {sidebarView === 'explorer' && vaultPath && (
-            <>
-              <button className="icon-btn" onClick={handleOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FolderOpen size={16} />
-              </button>
-              <button className="icon-btn" onClick={() => handleSidebarCreateFile(vaultPath)} title="New File" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FilePlus size={16} />
-              </button>
-              <button className="icon-btn" onClick={() => handleSidebarCreateFolder(vaultPath)} title="New Folder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FolderPlus size={16} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+        <Sidebar
+          sidebarView={sidebarView}
+          vaultPath={vaultPath}
+          fileTree={fileTree}
+          activeFile={activeFile}
+          activeFileContent={activeFileContent}
+          activeHeading={activeHeading}
+          editorRef={editorRef}
+          onOpenFile={handleOpenFile}
+          onRenameFile={handleRenameFile}
+          onRequestDelete={requestDelete}
+          onCreateFile={handleSidebarCreateFile}
+          onCreateFolder={handleSidebarCreateFolder}
+          onMoveFile={handleMoveFile}
+          onDuplicateFile={handleDuplicateFile}
+          onFrontmatterChange={handleFrontmatterChange}
+          onOpenVault={handleOpenVault}
+        />
       )}
 
       <div className="main-content">

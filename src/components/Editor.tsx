@@ -1,193 +1,35 @@
 import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
-import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from '@milkdown/core';
-import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
-import { ProsemirrorAdapterProvider, usePluginViewFactory, useNodeViewFactory } from '@prosemirror-adapter/react';
-import { commonmark, imageSchema } from '@milkdown/preset-commonmark';
-import { gfm } from '@milkdown/preset-gfm';
-import { history } from '@milkdown/plugin-history';
-import { clipboard } from '@milkdown/plugin-clipboard';
-import { listener, listenerCtx } from '@milkdown/plugin-listener';
-import { tooltipFactory } from '@milkdown/plugin-tooltip';
-import { slashFactory } from '@milkdown/plugin-slash';
-import { prism } from '@milkdown/plugin-prism';
-import { trailing } from '@milkdown/plugin-trailing';
-import { indent } from '@milkdown/plugin-indent';
-
-import { Tooltip } from './Tooltip';
-import { LinkTooltip } from './LinkTooltip';
-import { Slash } from './Slash';
-import { WikiLink } from './WikiLink';
-import { EmojiPicker } from './EmojiPicker';
+import { editorViewCtx } from '@milkdown/core';
+import { Milkdown, MilkdownProvider } from '@milkdown/react';
+import { ProsemirrorAdapterProvider } from '@prosemirror-adapter/react';
 import { FindReplace } from './FindReplace';
 import { HoverPreview } from './HoverPreview';
-import { CustomImage } from './CustomImage';
-// import { remarkFrontmatterPlugin, yamlNode, FrontmatterNode } from './FrontmatterNode';
-import { search } from 'prosemirror-search';
-
-import { emoji } from '@milkdown/plugin-emoji';
-import { cursor } from '@milkdown/plugin-cursor';
-import { $prose, $view } from '@milkdown/utils';
-import { Plugin } from '@milkdown/prose/state';
 import 'prismjs/themes/prism-tomorrow.css';
-import 'katex/dist/katex.min.css';
-import './Editor.css'; // Keep the import, we'll rewrite the CSS file later
+import './Editor.css';
 
 export interface EditorHandle {
   insertLink: (file: { name: string, path: string }) => void;
   scrollToHeader: (hash: string) => void;
 }
 
-interface EditorProps {
-  initialContent: string;
-  onSave: (content: string) => void;
-  fileName: string;
-  filePath: string;
-  workspaceRoot?: string; // Passed from parent
-  initialCursorPos?: number;
-  onCursorChange?: (pos: number) => void;
-  onActiveHeadingChange?: (id: string) => void;
-  allFiles?: { name: string, path: string }[];
-  onNavigate?: (filePath: string) => void;
-  onCreateFile?: (fileName: string) => void;
-  onRename?: (oldPath: string, newName: string) => void;
-  onStatsChange?: (stats: { wordCount: number, charCount: number, readingTime: number }) => void;
-  children?: React.ReactNode;
-}
-
-const tooltipPlugin = tooltipFactory('TOOLTIP');
-const linkTooltipPlugin = tooltipFactory('LINK_TOOLTIP');
-const slashPlugin = slashFactory('SLASH');
-const wikiLinkPlugin = slashFactory('WIKILINK');
-const emojiPickerPlugin = slashFactory('EMOJIPICKER');
-
-const dragDropFixPlugin = $prose(() => new Plugin({
-  props: {
-    handleDOMEvents: {
-      dragover(_view, event) {
-        if (event.dataTransfer) {
-          event.dataTransfer.dropEffect = 'move';
-        }
-        return false;
-      }
-    }
-  }
-}));
-
-const searchPlugin = $prose(() => search());
+import { EditorProps, useGladeEditor } from './useGladeEditor';
 
 const MilkdownInner = forwardRef<EditorHandle, EditorProps>((props, ref) => {
-  const pluginViewFactory = usePluginViewFactory();
-  const nodeViewFactory = useNodeViewFactory();
-
-  const customImageView = React.useMemo(() => {
-    return $view(imageSchema.node, () => nodeViewFactory({ 
-      component: () => <CustomImage workspaceRoot={props.workspaceRoot} filePath={props.filePath} /> 
-    }));
-  }, [nodeViewFactory, props.workspaceRoot, props.filePath]);
-
-  // const frontmatterView = React.useMemo(() => {
-  //   return $view(yamlNode, () => nodeViewFactory({
-  //     component: FrontmatterNode,
-  //     as: 'div'
-  //   }));
-  // }, [nodeViewFactory]);
-
-  const { get } = useEditor((root) =>
-    Editor.make()
-      .config((ctx) => {
-        ctx.set(rootCtx, root);
-        ctx.set(defaultValueCtx, props.initialContent);
-        
-        ctx.set(tooltipPlugin.key, {
-          view: pluginViewFactory({
-            component: Tooltip
-          })
-        });
-
-        ctx.set(linkTooltipPlugin.key, {
-          view: pluginViewFactory({
-            component: LinkTooltip
-          })
-        });
-        
-        ctx.set(slashPlugin.key, {
-          view: pluginViewFactory({
-            component: Slash
-          })
-        });
-
-        ctx.set(wikiLinkPlugin.key, {
-          view: pluginViewFactory({
-            component: () => <WikiLink workspaceRoot={props.workspaceRoot || ''} />
-          })
-        });
-
-        ctx.set(emojiPickerPlugin.key, {
-          view: pluginViewFactory({
-            component: EmojiPicker
-          })
-        });
-
-        ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
-          if (markdown !== prevMarkdown) {
-            props.onSave(markdown);
-          }
-        });
-
-        const computeStats = (text: string) => {
-          const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
-          const charCount = text.length;
-          const readingTime = wordCount / 200; // Keep it as a float so StatusBar can Math.ceil it if it wants, or we can Math.ceil it here.
-          if (props.onStatsChange) {
-            props.onStatsChange({ wordCount, charCount, readingTime });
-          }
-        };
-
-        ctx.get(listenerCtx).mounted((ctx) => {
-          const text = ctx.get(editorViewCtx).state.doc.textContent;
-          computeStats(text);
-        });
-
-        ctx.get(listenerCtx).updated((_ctx, doc, prevDoc) => {
-          if (doc !== prevDoc) {
-             computeStats(doc.textContent);
-          }
-        });
-      })
-      .use(commonmark)
-      .use(gfm)
-      .use(history)
-      .use(clipboard)
-      .use(listener)
-      .use(tooltipPlugin)
-      .use(linkTooltipPlugin)
-      .use(slashPlugin)
-      .use(wikiLinkPlugin)
-      .use(emojiPickerPlugin)
-      .use(searchPlugin)
-      .use(prism)
-      .use(trailing)
-      .use(indent)
-      .use(dragDropFixPlugin)
-      .use(customImageView)
-      // .use(remarkFrontmatterPlugin)
-      // .use(yamlNode)
-      // .use(frontmatterView)
-      .use(emoji)
-      .use(cursor)
-  );
+  const { get } = useGladeEditor(props);
 
   useEffect(() => {
     let isMounted = true;
     let unlistenFn: (() => void) | undefined;
     
     import('@tauri-apps/api/webview').then(({ getCurrentWebview }) => {
-      getCurrentWebview().onDragDropEvent((event) => {
-        if (event.payload.type === 'drop') {
-          const { paths, position } = event.payload;
-          if (paths && paths.length > 0) {
-            const editor = get();
-            if (!editor) return;
+      try {
+        const webview = getCurrentWebview();
+        webview.onDragDropEvent((event) => {
+          if (event.payload.type === 'drop') {
+            const { paths, position } = event.payload;
+            if (paths && paths.length > 0) {
+              const editor = get();
+              if (!editor) return;
 
             editor.action(async (ctx) => {
               const view = ctx.get(editorViewCtx);
@@ -267,7 +109,14 @@ const MilkdownInner = forwardRef<EditorHandle, EditorProps>((props, ref) => {
         } else {
           unlistenFn = fn;
         }
+      }).catch(err => {
+        console.warn("Failed to attach drag and drop event (likely not running in Tauri):", err);
       });
+      } catch (err) {
+        console.warn("Failed to get current webview (likely not running in Tauri):", err);
+      }
+    }).catch(err => {
+      console.warn("Failed to load Tauri webview API (likely not running in Tauri):", err);
     });
 
     return () => {
