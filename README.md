@@ -17,6 +17,7 @@ Glade is a modern, sleek, and highly extensible Markdown knowledge base and IDE.
 - [Architecture](ARCHITECTURE.md) - Understand the technical design of Glade (Tauri + React + Milkdown).
 - [Roadmap](ROADMAP.md) - See our planned features and future direction.
 - [Contributing](CONTRIBUTING.md) - Guidelines for developers to set up the project locally.
+- [Development](DEVELOPMENT.md) - Instructions for building Glade from source.
 - [Code of Conduct](CODE_OF_CONDUCT.md) - Community guidelines.
 
 ## Quick Start
@@ -47,28 +48,7 @@ To bypass this:
 
 ### Development Setup
 
-If you want to build Glade from source:
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/rayintheloop/glade.git
-   cd glade
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Run the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Build for production:
-   ```bash
-   npm run build
-   ```
+Please refer to our [Development Guide](DEVELOPMENT.md) for instructions on how to build Glade from source.
 
 ## License
 
