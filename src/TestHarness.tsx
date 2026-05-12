@@ -44,11 +44,11 @@ const TestHarness: React.FC = () => {
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
-        mode={paletteMode}
+        initialMode={paletteMode}
         commands={[{ id: 'toggle-sidebar', name: 'Toggle Sidebar', action: () => {} }]}
-        files={[{ name: 'test.md', path: '/test.md', isDirectory: false }]}
-        onSelectCommand={() => {}}
-        onSelectFile={() => {}}
+        files={[{ name: 'test.md', path: '/test.md', isDirectory: false, children: [] }]}
+        onFileSelect={() => {}}
+        hotkeys={{}}
       />
     </div>
   );
