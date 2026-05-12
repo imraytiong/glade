@@ -25,6 +25,26 @@ Glade is a modern, sleek, and highly extensible Markdown knowledge base and IDE.
 
 For early alpha testers, you can download the latest binaries from the [Releases](../../releases) page once they are built via GitHub Actions.
 
+#### Quick Install (macOS Apple Silicon)
+To cleanly download the latest release for modern Macs (M1/M2/M3 chips) and automatically bypass macOS "damaged app" Gatekeeper warnings, paste this single command into your terminal:
+
+```bash
+curl -s https://api.github.com/repos/imraytiong/glade/releases | grep "browser_download_url.*aarch64\.dmg" | head -n 1 | cut -d '"' -f 4 | xargs curl -L -o Glade.dmg && hdiutil attach Glade.dmg
+```
+
+Once the disk image mounts, simply drag **Glade** into your `Applications` folder.
+
+#### Manual Download Troubleshooting
+If you prefer to manually download the `.dmg` file from the browser, macOS will quarantine the file because Glade is currently an unsigned open-source alpha. This causes a misleading error stating the **"App is damaged and can't be opened."**
+
+To bypass this:
+1. Drag **Glade** from the `.dmg` into your `Applications` folder.
+2. Open your terminal and run the following command to remove the quarantine flag:
+   ```bash
+   xattr -cr /Applications/Glade.app
+   ```
+3. You can now launch Glade normally from your Applications folder!
+
 ### Development Setup
 
 If you want to build Glade from source:
