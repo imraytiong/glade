@@ -1,5 +1,8 @@
-# Glade
+<p align="center">
+  <img src="app-icon.png" width="128" height="128" alt="Glade Logo">
+</p>
 
+# Glade
 **Version:** 0.0.1-alpha.1
 
 > [!CAUTION]
