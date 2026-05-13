@@ -24,3 +24,8 @@ If you want to build Glade from source:
    ```bash
    npm run build
    ```
+
+5. Run Headless Telemetry & Backend Tests:
+   ```bash
+   cargo test --manifest-path src-tauri/Cargo.toml
+   ```

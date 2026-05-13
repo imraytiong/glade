@@ -13,6 +13,7 @@ Glade is a desktop application built on top of the **Tauri v2** framework, utili
   - Native OS Dialogs (`tauri-plugin-dialog`)
   - OS-Level window management (titlebar, sizing, protocols)
   - Custom protocol handlers (`asset://`) to serve local images securely to the WebView.
+  - **Multi-Agent System (MAS) Engine:** Manages agent registry, Gemini API HTTP communication (`reqwest`), and structured telemetry (`tracing`), fully decoupled from the UI layer for robust headless testing.
 
 ### Frontend (React / Vite)
 - **Framework:** React 19 bundled with Vite.
@@ -21,6 +22,7 @@ Glade is a desktop application built on top of the **Tauri v2** framework, utili
   - UI layout, sidebar management, tabs.
   - Command palette execution.
   - Communication with the Rust backend via `@tauri-apps/api`.
+  - **Agent Command Center:** A dual-paradigm UX consisting of a right-hand conversational sidebar and an inline editor prompt for contextual AI refactoring.
 
 ### Editor (Milkdown)
 - **Engine:** Milkdown (built on ProseMirror & remark).

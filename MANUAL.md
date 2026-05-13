@@ -24,6 +24,19 @@ Glade uses a WYSIWYG (What You See Is What You Get) markdown editor. You can typ
 ### Slash Commands
 Type `/` anywhere in a document to open the slash menu. This allows you to quickly insert headings, lists, tables, code blocks, and other elements without remembering markdown syntax.
 
+## Agent Command Center (Glade AI)
+Glade is built around a native Multi-Agent System. You must configure your Gemini API Key in the Settings (`Cmd/Ctrl + ,`) to use these features.
+
+### Right Sidebar Chat
+Click the **Bot Icon** in the top right (or toggle the right sidebar) to open the Agent Chat. 
+- You can converse with the Coordinator agent here.
+- The chat is **context-aware**, meaning it automatically knows the contents of your active document. You can ask questions like "Summarize this document" and it will read the active file.
+
+### Inline Editor Prompts
+For contextual refactoring, you can invoke the AI directly in the editor:
+- **Generative Prompt:** Type `/agent` to open a floating prompt. Tell the AI what you want to write (e.g. "Draft an email to my boss about Friday's meeting"), and it will stream the markdown directly into your document.
+- **Refactoring:** Highlight a section of text and click the "Sparkle (AI)" icon in the formatting tooltip. Tell the AI how to rewrite the text (e.g. "Make this more professional" or "Translate to Spanish") and it will replace your selection with the result.
+
 ## Frontmatter & Properties
 The right sidebar contains the **Outline** and **Properties** panes. 
 - The Properties pane allows you to edit the YAML frontmatter of your document visually.
