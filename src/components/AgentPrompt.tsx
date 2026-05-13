@@ -6,7 +6,7 @@ import { replaceRange } from '@milkdown/utils';
 import { invoke } from '@tauri-apps/api/core';
 import { Bot, Loader2 } from 'lucide-react';
 import { useError } from '../contexts/ErrorContext';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+
 import { Agent } from '../types/agent';
 
 export const AgentPrompt = () => {
@@ -65,13 +65,12 @@ export const AgentPrompt = () => {
             const vaultPath = localStorage.getItem('glade_vault_path');
             if (!vaultPath) return;
             try {
-                const content = await readTextFile(`${vaultPath}/.glade/agents.json`);
-                const parsed = JSON.parse(content);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setAgents(parsed);
-                    if (!parsed.find((a: Agent) => a.id === selectedAgentId)) {
-                        const refactorAgent = parsed.find((a: Agent) => a.id === 'refactor');
-                        setSelectedAgentId(refactorAgent ? 'refactor' : parsed[0].id);
+                const agentsData = await invoke<Agent[]>('get_agents', { vaultPath });
+                if (Array.isArray(agentsData) && agentsData.length > 0) {
+                    setAgents(agentsData);
+                    if (!agentsData.find((a: Agent) => a.id === selectedAgentId)) {
+                        const refactorAgent = agentsData.find((a: Agent) => a.id === 'refactor');
+                        setSelectedAgentId(refactorAgent ? 'refactor' : agentsData[0].id);
                     }
                 }
             } catch (err) {
@@ -99,8 +98,9 @@ export const AgentPrompt = () => {
             // Call the agent
             const response = await invoke<string>('invoke_agent', {
                 agent: selectedAgent,
-                query: prompt.trim(),
-                context: ''
+                messages: [{ role: 'user', content: prompt.trim() }],
+                context: '',
+                vaultPath: localStorage.getItem('glade_vault_path')
             });
 
             const editor = getEditor();
@@ -111,6 +111,7 @@ export const AgentPrompt = () => {
                     v.focus();
                 });
             }
+            window.dispatchEvent(new Event('vault-files-changed'));
         } catch (err) {
             console.error("Agent error:", err);
             

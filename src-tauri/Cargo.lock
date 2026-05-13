@@ -1404,6 +1404,7 @@ dependencies = [
 name = "glade"
 version = "0.0.1-alpha.1"
 dependencies = [
+ "async-trait",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4401,7 +4402,9 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

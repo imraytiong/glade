@@ -73,6 +73,8 @@ pub struct GeminiResponse {
 #[derive(Deserialize, Debug)]
 pub struct Candidate {
     pub content: Option<CandidateContent>,
+    #[serde(rename = "finishReason")]
+    pub finish_reason: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]

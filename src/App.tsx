@@ -7,6 +7,7 @@ import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
 import { useSettings } from './utils/settings';
 
+import AgentSidebar, { Message } from './components/layout/AgentSidebar';
 import Editor, { EditorHandle } from './components/Editor';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
@@ -16,7 +17,6 @@ import BacklinksPane from './components/BacklinksPane';
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import Sidebar from './components/layout/Sidebar';
-import AgentSidebar from './components/layout/AgentSidebar';
 import './App.css';
 
 function extractFrontmatter(content: string) {
@@ -42,6 +42,7 @@ function App() {
   });
   
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(250);
   const [sidebarView, setSidebarView] = useState<'explorer' | 'outline' | 'agents'>('explorer');
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState<boolean>(false);
   const [agentSidebarWidth, setAgentSidebarWidth] = useState<number>(300);
@@ -118,9 +119,20 @@ function App() {
     }
   }, [vaultPath, loadVaultFiles]);
 
+  useEffect(() => {
+    const handleFilesChanged = () => {
+      if (vaultPath) {
+        loadVaultFiles(vaultPath);
+      }
+    };
+    window.addEventListener('vault-files-changed', handleFilesChanged);
+    return () => window.removeEventListener('vault-files-changed', handleFilesChanged);
+  }, [vaultPath, loadVaultFiles]);
+
   const [activeFileContent, setActiveFileContent] = useState<{ path: string, content: string, frontmatter: string | null } | null>(null);
   const [activeHeading, setActiveHeading] = useState<string>('');
   const [stats, setStats] = useState<{ wordCount: number, charCount: number, readingTime: number } | null>(null);
+  const [agentMessages, setAgentMessages] = useState<Message[]>([]);
 
   // Load File Content when active tab changes
   useEffect(() => {
@@ -603,24 +615,56 @@ function App() {
       )}
 
       {isSidebarOpen && !isZenMode && (
-        <Sidebar
-          sidebarView={sidebarView}
-          vaultPath={vaultPath}
-          fileTree={fileTree}
-          activeFile={activeFile}
-          activeFileContent={activeFileContent}
-          activeHeading={activeHeading}
-          editorRef={editorRef}
-          onOpenFile={handleOpenFile}
-          onRenameFile={handleRenameFile}
-          onRequestDelete={requestDelete}
-          onCreateFile={handleSidebarCreateFile}
-          onCreateFolder={handleSidebarCreateFolder}
-          onMoveFile={handleMoveFile}
-          onDuplicateFile={handleDuplicateFile}
-          onFrontmatterChange={handleFrontmatterChange}
-          onOpenVault={handleOpenVault}
-        />
+        <div style={{ display: 'flex', flexShrink: 0, height: '100%', width: `${sidebarWidth}px` }}>
+          <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
+            <Sidebar
+              sidebarView={sidebarView}
+              vaultPath={vaultPath}
+              fileTree={fileTree}
+              activeFile={activeFile}
+              activeFileContent={activeFileContent}
+              activeHeading={activeHeading}
+              editorRef={editorRef}
+              onOpenFile={handleOpenFile}
+              onRenameFile={handleRenameFile}
+              onRequestDelete={requestDelete}
+              onCreateFile={handleSidebarCreateFile}
+              onCreateFolder={handleSidebarCreateFolder}
+              onMoveFile={handleMoveFile}
+              onDuplicateFile={handleDuplicateFile}
+              onFrontmatterChange={handleFrontmatterChange}
+              onOpenVault={handleOpenVault}
+            />
+          </div>
+          <div
+            style={{
+              width: '4px',
+              cursor: 'col-resize',
+              backgroundColor: 'transparent',
+              flexShrink: 0,
+              zIndex: 10
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = sidebarWidth;
+
+              const onMouseMove = (moveEvent: MouseEvent) => {
+                const delta = moveEvent.clientX - startX; // Right handle
+                const newWidth = Math.max(150, Math.min(600, startWidth + delta));
+                setSidebarWidth(newWidth);
+              };
+
+              const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+              };
+
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            }}
+          />
+        </div>
       )}
 
       <div className="main-content">
@@ -728,7 +772,12 @@ function App() {
             }}
           />
           <div style={{ width: `${agentSidebarWidth}px`, flexShrink: 0, height: '100%', display: 'flex' }}>
-            <AgentSidebar activeFileContent={activeFileContent} vaultPath={vaultPath} />
+            <AgentSidebar 
+              activeFileContent={activeFileContent} 
+              vaultPath={vaultPath} 
+              messages={agentMessages}
+              setMessages={setAgentMessages}
+            />
           </div>
         </>
       )}

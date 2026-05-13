@@ -6,24 +6,24 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './AgentSidebar.css';
 
-interface Message {
+export interface Message {
   id: string;
   role: 'user' | 'agent';
   content: string;
 }
 
-import { readTextFile } from '@tauri-apps/plugin-fs';
 import { Agent } from '../../types/agent';
 
 interface AgentSidebarProps {
   activeFileContent: { path: string, content: string } | null;
   vaultPath: string | null;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
-export default function AgentSidebar({ activeFileContent, vaultPath }: AgentSidebarProps) {
+export default function AgentSidebar({ activeFileContent, vaultPath, messages, setMessages }: AgentSidebarProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('coordinator');
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,21 +41,29 @@ export default function AgentSidebar({ activeFileContent, vaultPath }: AgentSide
     if (!vaultPath) return;
     const loadAgents = async () => {
       try {
-        const content = await readTextFile(`${vaultPath}/.glade/agents.json`);
-        const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setAgents(parsed);
+        const fetchedAgents = await invoke<Agent[]>('get_agents', { vaultPath });
+        if (Array.isArray(fetchedAgents) && fetchedAgents.length > 0) {
+          setAgents(fetchedAgents);
           // If the previously selected agent doesn't exist anymore, reset it
-          if (!parsed.find((a: Agent) => a.id === selectedAgentId)) {
-            setSelectedAgentId(parsed[0].id);
-          }
+          setAgents((currentAgents) => {
+             if (!currentAgents.find((a: Agent) => a.id === selectedAgentId)) {
+                setSelectedAgentId(fetchedAgents[0].id);
+             }
+             return fetchedAgents;
+          });
         }
       } catch (err) {
         console.error("Failed to load agents in sidebar", err);
       }
     };
     loadAgents();
-  }, [vaultPath]);
+
+    const handleAgentsUpdated = () => {
+      loadAgents();
+    };
+    window.addEventListener('agents-updated', handleAgentsUpdated);
+    return () => window.removeEventListener('agents-updated', handleAgentsUpdated);
+  }, [vaultPath, selectedAgentId]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -80,8 +88,9 @@ export default function AgentSidebar({ activeFileContent, vaultPath }: AgentSide
 
       const response = await invoke<string>('invoke_agent', {
         agent: selectedAgent,
-        query: userMessage.content,
-        context: activeFileContent ? `Active File Context: ${activeFileContent.path}\n\n${activeFileContent.content}` : ''
+        messages: [...messages, userMessage],
+        context: activeFileContent ? `Active File Context: ${activeFileContent.path}\n\n${activeFileContent.content}` : '',
+        vaultPath
       });
 
       const agentMessage: Message = {
@@ -91,6 +100,7 @@ export default function AgentSidebar({ activeFileContent, vaultPath }: AgentSide
       };
 
       setMessages(prev => [...prev, agentMessage]);
+      window.dispatchEvent(new Event('vault-files-changed'));
     } catch (error) {
       console.error('Agent error:', error);
       

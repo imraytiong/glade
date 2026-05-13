@@ -1,7 +1,9 @@
 mod agent;
 mod gemini;
+pub mod mcp;
 
 use walkdir::WalkDir;
+use tauri::Manager;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -26,6 +28,13 @@ fn list_md_files(dir: &str) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+#[tauri::command]
+async fn reload_mcp_servers(vault_path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let mcp_manager = app_handle.state::<mcp::McpManager>();
+    mcp_manager.reload(&vault_path).await?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -39,8 +48,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(agent::AgentRegistry::new())
-        .invoke_handler(tauri::generate_handler![greet, list_md_files, agent::invoke_agent])
+        .manage(mcp::McpManager::new())
+        .invoke_handler(tauri::generate_handler![
+            greet, 
+            list_md_files, 
+            agent::invoke_agent, 
+            reload_mcp_servers,
+            agent::get_agents,
+            agent::save_agent,
+            agent::delete_agent,
+            agent::get_available_tools,
+            agent::get_available_skills
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

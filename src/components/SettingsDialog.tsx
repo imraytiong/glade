@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useSettings } from '../utils/settings';
 import { load } from '@tauri-apps/plugin-store';
+import { invoke } from '@tauri-apps/api/core';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -10,8 +11,9 @@ interface SettingsDialogProps {
 
 export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const { settings, updateSettings } = useSettings();
-  const [activeTab, setActiveTab] = useState<'general' | 'ai'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'mcp'>('general');
   const [apiKey, setApiKey] = useState('');
+  const [mcpServersConfig, setMcpServersConfig] = useState('{\n  "mcpServers": {\n    \n  }\n}');
   const [model, setModel] = useState('');
   const [availableModels, setAvailableModels] = useState<{name: string, displayName: string}[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -29,6 +31,20 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
           if (val) setModel(val);
         });
       });
+      
+      const vaultPath = localStorage.getItem('glade_vault_path');
+      if (vaultPath) {
+          // Attempt to load mcp_servers.json from .glade folder using a Tauri command or similar...
+          // For now we'll just read it using tauri fs plugin
+          import('@tauri-apps/plugin-fs').then(({ readTextFile, exists }) => {
+              const mcpPath = `${vaultPath}/.glade/mcp_servers.json`;
+              exists(mcpPath).then(doesExist => {
+                  if (doesExist) {
+                      readTextFile(mcpPath).then(content => setMcpServersConfig(content)).catch(console.error);
+                  }
+              });
+          });
+      }
     }
   }, [isOpen]);
 
@@ -89,6 +105,21 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
     await store.save();
   };
 
+  const handleSaveMcpConfig = async () => {
+    const vaultPath = localStorage.getItem('glade_vault_path');
+    if (!vaultPath) return;
+    
+    try {
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(`${vaultPath}/.glade/mcp_servers.json`, mcpServersConfig);
+        await invoke('reload_mcp_servers', { vaultPath });
+        alert("MCP Configuration saved! The backend has reloaded the MCP servers.");
+    } catch (err) {
+        console.error("Failed to save MCP config", err);
+        alert("Failed to save MCP config");
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -138,6 +169,17 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
             }}
           >
             AI & Agents
+          </button>
+          <button 
+            onClick={() => setActiveTab('mcp')}
+            style={{ 
+              flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer',
+              color: activeTab === 'mcp' ? 'var(--text-normal)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'mcp' ? '2px solid var(--interactive-accent)' : '2px solid transparent',
+              fontWeight: activeTab === 'mcp' ? 600 : 400
+            }}
+          >
+            MCP Servers
           </button>
         </div>
 
@@ -270,6 +312,46 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                 )}
               </div>
             </>
+          )}
+
+          {activeTab === 'mcp' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <p style={{ fontSize: '14px', marginBottom: '12px' }}>
+                    Configure local MCP servers in Claude Desktop format. They will be spawned to provide extra tools to the agents.
+                </p>
+                <textarea 
+                    value={mcpServersConfig}
+                    onChange={(e) => setMcpServersConfig(e.target.value)}
+                    style={{
+                        width: '100%',
+                        minHeight: '250px',
+                        background: 'var(--background-secondary)',
+                        color: 'var(--text-normal)',
+                        border: '1px solid var(--background-modifier-border)',
+                        padding: '12px',
+                        borderRadius: '4px',
+                        fontFamily: 'monospace',
+                        resize: 'vertical',
+                        marginBottom: '16px'
+                    }}
+                    spellCheck={false}
+                />
+                <button 
+                    onClick={handleSaveMcpConfig}
+                    style={{
+                        background: 'var(--interactive-accent)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                        alignSelf: 'flex-end'
+                    }}
+                >
+                    Save MCP Configuration
+                </button>
+            </div>
           )}
         </div>
       </div>

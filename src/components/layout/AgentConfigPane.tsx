@@ -1,194 +1,286 @@
 import { useState, useEffect } from 'react';
-import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
-import { Plus, Trash2, Check, X } from 'lucide-react';
-import { Agent } from '../../types/agent';
+import { invoke } from '@tauri-apps/api/core';
+import { Plus, Trash2, Save, RefreshCw } from 'lucide-react';
 
-export default function AgentConfigPane({ vaultPath }: { vaultPath: string }) {
+export interface Agent {
+  id: string;
+  name: string;
+  system_prompt: string;
+  model_class?: string;
+  tools_allowed?: string[];
+  skills_allowed?: string[];
+  allow_internal_knowledge_fallback?: boolean;
+}
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+}
+
+interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface AgentConfigPaneProps {
+  vaultPath: string;
+}
+
+export default function AgentConfigPane({ vaultPath }: AgentConfigPaneProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Agent>>({});
-  const [loading, setLoading] = useState(true);
-
-  const agentsPath = `${vaultPath}/.glade/agents.json`;
-  const gladeDirPath = `${vaultPath}/.glade`;
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<SkillInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadAgents();
+    loadData();
   }, [vaultPath]);
 
-  const loadAgents = async () => {
+  const loadData = async () => {
+    setIsLoading(true);
     try {
-      setLoading(true);
-      const content = await readTextFile(agentsPath);
-      const parsed = JSON.parse(content);
-      setAgents(Array.isArray(parsed) ? parsed : []);
-    } catch (err) {
-      // If file doesn't exist, create defaults
-      const defaultAgents: Agent[] = [
-        {
-          id: "coordinator",
-          name: "Coordinator",
-          system_prompt: "You are the Glade Coordinator Agent. You help users manage their personal knowledge base. Use the provided active file context to answer questions accurately. Do not make up information.",
-          model_class: "fast"
-        },
-        {
-          id: "refactor",
-          name: "Refactor",
-          system_prompt: "You are an expert editor. You rewrite the user's provided text according to their prompt. Return ONLY the rewritten valid Markdown. Do not include introductory or conversational text like 'Here is the rewritten text:'.",
-          model_class: "fast"
-        }
-      ];
-      try {
-        await mkdir(gladeDirPath, { recursive: true });
-        await writeTextFile(agentsPath, JSON.stringify(defaultAgents, null, 2));
-        setAgents(defaultAgents);
-      } catch (writeErr) {
-        console.error("Failed to initialize default agents", writeErr);
+      const [agentsData, toolsData, skillsData] = await Promise.all([
+        invoke<Agent[]>('get_agents', { vaultPath }),
+        invoke<ToolInfo[]>('get_available_tools'),
+        invoke<SkillInfo[]>('get_available_skills', { vaultPath })
+      ]);
+      setAgents(agentsData);
+      setAvailableTools(toolsData);
+      setAvailableSkills(skillsData);
+      
+      if (agentsData.length > 0 && !selectedAgentId) {
+        handleSelectAgent(agentsData[0]);
+      } else if (selectedAgentId) {
+        const updated = agentsData.find(a => a.id === selectedAgentId);
+        if (updated) setEditingAgent(updated);
       }
+    } catch (e) {
+      console.error("Failed to load agent config data", e);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const saveAgents = async (newAgents: Agent[]) => {
-    try {
-      await writeTextFile(agentsPath, JSON.stringify(newAgents, null, 2));
-      setAgents(newAgents);
-    } catch (err) {
-      console.error("Failed to save agents", err);
-    }
+  const handleSelectAgent = (agent: Agent) => {
+    setSelectedAgentId(agent.id);
+    setEditingAgent({ ...agent });
   };
 
-  const handleAddAgent = () => {
-    const newId = `agent-${Date.now()}`;
+  const handleCreateAgent = () => {
     const newAgent: Agent = {
-      id: newId,
-      name: "New Agent",
-      system_prompt: "You are a helpful assistant.",
-      model_class: "fast"
+      id: `agent_${Date.now()}`,
+      name: 'New Agent',
+      system_prompt: 'You are a helpful assistant.',
+      model_class: 'fast',
+      tools_allowed: [],
+      skills_allowed: [],
+      allow_internal_knowledge_fallback: true
     };
-    const newAgents = [...agents, newAgent];
-    saveAgents(newAgents);
-    handleEditStart(newAgent);
+    setSelectedAgentId(newAgent.id);
+    setEditingAgent(newAgent);
   };
 
-  const handleDeleteAgent = (id: string) => {
-    const newAgents = agents.filter(a => a.id !== id);
-    saveAgents(newAgents);
-    if (editingId === id) {
-      setEditingId(null);
+  const handleSave = async () => {
+    if (!editingAgent) return;
+    try {
+      await invoke('save_agent', { vaultPath, agent: editingAgent });
+      window.dispatchEvent(new Event('agents-updated'));
+      await loadData();
+    } catch (e) {
+      console.error("Failed to save agent", e);
     }
   };
 
-  const handleEditStart = (agent: Agent) => {
-    setEditingId(agent.id);
-    setEditForm({ ...agent });
-  };
-
-  const handleEditSave = () => {
-    if (!editingId) return;
-    const newAgents = agents.map(a => {
-      if (a.id === editingId) {
-        return { ...a, ...editForm } as Agent;
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this agent?')) return;
+    try {
+      await invoke('delete_agent', { vaultPath, agentId: id });
+      if (selectedAgentId === id) {
+        setSelectedAgentId(null);
+        setEditingAgent(null);
       }
-      return a;
-    });
-    saveAgents(newAgents);
-    setEditingId(null);
+      window.dispatchEvent(new Event('agents-updated'));
+      await loadData();
+    } catch (e) {
+      console.error("Failed to delete agent", e);
+    }
   };
-
-  const handleEditCancel = () => {
-    setEditingId(null);
-  };
-
-  if (loading) {
-    return <div style={{ padding: '16px', color: 'var(--text-faint)' }}>Loading agents...</div>;
-  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Custom Agents</h3>
-        <button className="icon-btn" onClick={handleAddAgent} title="New Agent">
-          <Plus size={14} />
-        </button>
+    <div className="agent-config-pane" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--background-modifier-border)' }}>
+      <div style={{ padding: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--background-modifier-border)' }}>
+        <h3 style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Agents Config</h3>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button className="icon-btn" onClick={loadData} title="Refresh Data" disabled={isLoading}>
+            <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
+          </button>
+          <button className="icon-btn" onClick={handleCreateAgent} title="New Agent">
+            <Plus size={14} />
+          </button>
+        </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-        {agents.map(agent => (
-          <div key={agent.id} style={{ 
-            marginBottom: '8px', 
-            background: 'var(--background-secondary)', 
-            borderRadius: '6px',
-            border: editingId === agent.id ? '1px solid var(--text-accent)' : '1px solid transparent',
-            overflow: 'hidden'
-          }}>
-            {editingId === agent.id ? (
-              <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Name</label>
-                  <input 
-                    type="text" 
-                    value={editForm.name || ''} 
-                    onChange={e => setEditForm({...editForm, name: e.target.value})}
-                    style={{ width: '100%', background: 'var(--background-primary)', border: '1px solid var(--background-modifier-border)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontSize: '13px' }}
-                  />
-                </div>
-                
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Model Class</label>
-                  <select 
-                    value={editForm.model_class || 'fast'} 
-                    onChange={e => setEditForm({...editForm, model_class: e.target.value})}
-                    style={{ width: '100%', background: 'var(--background-primary)', border: '1px solid var(--background-modifier-border)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontSize: '13px' }}
-                  >
-                    <option value="fast">Fast (e.g. Flash)</option>
-                    <option value="reasoning">Reasoning (e.g. Pro)</option>
-                    <option value="large">Large (e.g. Ultra)</option>
-                  </select>
-                </div>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Agent List */}
+        <div style={{ width: '150px', borderRight: '1px solid var(--background-modifier-border)', overflowY: 'auto' }}>
+          {agents.map(a => (
+            <div 
+              key={a.id}
+              className="agent-list-item"
+              onClick={() => handleSelectAgent(a)}
+              style={{
+                padding: '8px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                backgroundColor: selectedAgentId === a.id ? 'var(--background-modifier-active)' : 'transparent',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+              {a.id !== 'coordinator' && a.id !== 'refactor' && (
+                <button 
+                  className="icon-btn" 
+                  onClick={(e) => { e.stopPropagation(); handleDelete(a.id); }}
+                  style={{ opacity: selectedAgentId === a.id ? 1 : 0 }}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>System Prompt</label>
-                  <textarea 
-                    value={editForm.system_prompt || ''} 
-                    onChange={e => setEditForm({...editForm, system_prompt: e.target.value})}
-                    rows={6}
-                    style={{ width: '100%', background: 'var(--background-primary)', border: '1px solid var(--background-modifier-border)', color: 'var(--text-primary)', padding: '6px 8px', borderRadius: '4px', fontSize: '12px', resize: 'vertical' }}
-                  />
-                </div>
+        {/* Editor Form */}
+        {editingAgent ? (
+          <div style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>Name</label>
+              <input 
+                className="glade-input"
+                style={{ width: '100%' }}
+                value={editingAgent.name}
+                onChange={e => setEditingAgent({...editingAgent, name: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>ID</label>
+              <input 
+                className="glade-input"
+                style={{ width: '100%' }}
+                value={editingAgent.id}
+                disabled
+              />
+            </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-                  <button onClick={handleEditCancel} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', borderRadius: '4px' }} className="hover-bg">
-                    <X size={12} /> Cancel
-                  </button>
-                  <button onClick={handleEditSave} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--text-accent)', color: '#000', border: 'none', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}>
-                    <Check size={12} /> Save
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div 
-                style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                className="hover-bg"
-                onClick={() => handleEditStart(agent)}
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>System Prompt</label>
+              <textarea 
+                className="glade-input"
+                style={{ width: '100%', minHeight: '100px', resize: 'vertical' }}
+                value={editingAgent.system_prompt}
+                onChange={e => setEditingAgent({...editingAgent, system_prompt: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>Model Class</label>
+              <select 
+                className="glade-input"
+                style={{ width: '100%' }}
+                value={editingAgent.model_class || 'fast'}
+                onChange={e => setEditingAgent({...editingAgent, model_class: e.target.value})}
               >
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)' }}>{agent.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{agent.model_class}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button className="icon-btn" onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent.id); }} title="Delete">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                <option value="fast">Fast (e.g. Gemini Flash)</option>
+                <option value="reasoning">Reasoning (e.g. Gemini Pro)</option>
+                <option value="large">Large (Highest capability)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>Tools Allowed</label>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--background-modifier-border)', padding: '4px', borderRadius: '4px' }}>
+                {availableTools.map(tool => {
+                  const isChecked = editingAgent.tools_allowed?.includes(tool.name) || false;
+                  return (
+                    <label key={tool.name} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '13px', padding: '4px 0', borderBottom: '1px solid var(--background-modifier-border)' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isChecked}
+                        style={{ marginTop: '3px' }}
+                        onChange={(e) => {
+                          let newTools = [...(editingAgent.tools_allowed || [])];
+                          if (e.target.checked) newTools.push(tool.name);
+                          else newTools = newTools.filter(t => t !== tool.name);
+                          setEditingAgent({...editingAgent, tools_allowed: newTools});
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 500 }}>{tool.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.2, marginTop: '2px' }}>{tool.description}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+                {availableTools.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No tools available.</span>}
               </div>
-            )}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', color: 'var(--text-muted)' }}>Skills Allowed</label>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--background-modifier-border)', padding: '4px', borderRadius: '4px' }}>
+                {availableSkills.map(skill => (
+                  <label key={skill.id} className="tool-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '2px 0' }}>
+                    <input
+                      type="checkbox"
+                      checked={(editingAgent.skills_allowed || []).includes(skill.id)}
+                      onChange={(e) => {
+                        const current = editingAgent.skills_allowed || [];
+                        const updated = e.target.checked
+                          ? [...current, skill.id]
+                          : current.filter(s => s !== skill.id);
+                        setEditingAgent({ ...editingAgent, skills_allowed: updated });
+                      }}
+                    />
+                    <div className="tool-info" style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span className="tool-name" style={{ fontWeight: 500 }}>{skill.name}</span>
+                      <span className="tool-description" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{skill.description}</span>
+                    </div>
+                  </label>
+                ))}
+                {availableSkills.length === 0 && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No skills found. Ensure directories with SKILL.md exist in .agents/skills/</span>}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={editingAgent.allow_internal_knowledge_fallback !== false}
+                  onChange={e => setEditingAgent({...editingAgent, allow_internal_knowledge_fallback: e.target.checked})}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: 500 }}>Allow Internal Knowledge Fallback</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>If enabled, the agent can use its pre-trained knowledge if no external search tools are provided.</span>
+                </div>
+              </label>
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="icon-btn" onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '4px', backgroundColor: 'var(--interactive-accent)', color: 'white' }}>
+                <Save size={14} />
+                <span style={{ fontSize: '13px' }}>Save</span>
+              </button>
+            </div>
           </div>
-        ))}
-        {agents.length === 0 && (
-          <div style={{ padding: '16px', color: 'var(--text-faint)', fontSize: '13px', textAlign: 'center' }}>
-            No custom agents found.
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+            Select an agent to edit
           </div>
         )}
       </div>

@@ -31,6 +31,7 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 async-trait = "0.1.89"
+tokio = { version = "1.52.3", features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }

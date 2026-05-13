@@ -36,8 +36,8 @@ async fn test_mock_coordinator_routing_success() {
         .mount(&mock_server)
         .await;
         
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -45,7 +45,8 @@ async fn test_mock_coordinator_routing_success() {
         "gemini-1.5-flash",
         "What does the document say?",
         "This document is about testing.",
-        Some(&base_url)
+        Some(&base_url),
+        None
     ).await;
     
     assert!(result.is_ok());
@@ -64,8 +65,8 @@ async fn test_mock_401_unauthorized() {
         .mount(&mock_server)
         .await;
         
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -73,7 +74,8 @@ async fn test_mock_401_unauthorized() {
         "gemini-1.5-flash",
         "Query",
         "",
-        Some(&base_url)
+        Some(&base_url),
+        None
     ).await;
     
     assert!(result.is_err());
@@ -93,8 +95,8 @@ async fn test_mock_503_service_unavailable() {
         .mount(&mock_server)
         .await;
         
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -102,7 +104,8 @@ async fn test_mock_503_service_unavailable() {
         "gemini-1.5-flash",
         "Query",
         "",
-        Some(&base_url)
+        Some(&base_url),
+        None
     ).await;
     
     assert!(result.is_err());
@@ -121,8 +124,8 @@ async fn test_mock_malformed_json_response() {
         .mount(&mock_server)
         .await;
         
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -130,7 +133,8 @@ async fn test_mock_malformed_json_response() {
         "gemini-1.5-flash",
         "Query",
         "",
-        Some(&base_url)
+        Some(&base_url),
+        None
     ).await;
     
     assert!(result.is_err()); // JSON parsing should fail
@@ -151,8 +155,8 @@ async fn test_mock_empty_llm_response() {
         .mount(&mock_server)
         .await;
         
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -160,11 +164,12 @@ async fn test_mock_empty_llm_response() {
         "gemini-1.5-flash",
         "Query",
         "",
-        Some(&base_url)
+        Some(&base_url),
+        None
     ).await;
     
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "No response generated.");
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), "No response candidate generated.");
 }
 
 // ==========================================
@@ -180,8 +185,8 @@ async fn test_live_coordinator_routing() {
     }
     
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set for live tests");
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("coordinator").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "coordinator").unwrap();
     
     let result = execute_agent(
         agent,
@@ -189,6 +194,7 @@ async fn test_live_coordinator_routing() {
         "gemini-1.5-flash",
         "What is the secret word in the document?",
         "The secret word is 'Antigravity'.",
+        None,
         None
     ).await;
     
@@ -206,8 +212,8 @@ async fn test_live_refactor_formatting() {
     }
     
     let api_key = env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set for live tests");
-    let registry = AgentRegistry::new();
-    let agent = registry.agents.get("refactor").unwrap();
+    let defaults = AgentRegistry::get_default_agents();
+    let agent = &defaults.into_iter().find(|a| a.id == "refactor").unwrap();
     
     let result = execute_agent(
         agent,
@@ -215,6 +221,7 @@ async fn test_live_refactor_formatting() {
         "gemini-1.5-flash",
         "Make this a bulleted list: apple, banana, cherry",
         "",
+        None,
         None
     ).await;
     
