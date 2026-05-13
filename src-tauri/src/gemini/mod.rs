@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GeminiRequest {
     pub contents: Vec<Content>,
@@ -10,18 +10,18 @@ pub struct GeminiRequest {
     pub tools: Option<Vec<Tool>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Content {
     pub role: String,
     pub parts: Vec<Part>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct SystemInstruction {
     pub parts: Vec<Part>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum Part {
     Text(String),
@@ -59,7 +59,7 @@ pub struct FunctionCall {
     pub args: serde_json::Value,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct FunctionResponse {
     pub name: String,
     pub response: serde_json::Value,
