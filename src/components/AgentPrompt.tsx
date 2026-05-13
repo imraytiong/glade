@@ -6,6 +6,8 @@ import { replaceRange } from '@milkdown/utils';
 import { invoke } from '@tauri-apps/api/core';
 import { Bot, Loader2 } from 'lucide-react';
 import { useError } from '../contexts/ErrorContext';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { Agent } from '../types/agent';
 
 export const AgentPrompt = () => {
     const ref = useRef<HTMLDivElement>(null);
@@ -13,6 +15,9 @@ export const AgentPrompt = () => {
     const [loading, getEditor] = useInstance();
     const [prompt, setPrompt] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [selectedAgentId, setSelectedAgentId] = useState<string>('refactor');
     
     // Manage visibility and position ourselves
     const [isOpen, setIsOpen] = useState(false);
@@ -55,6 +60,27 @@ export const AgentPrompt = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
 
+    useEffect(() => {
+        const loadAgents = async () => {
+            const vaultPath = localStorage.getItem('glade_vault_path');
+            if (!vaultPath) return;
+            try {
+                const content = await readTextFile(`${vaultPath}/.glade/agents.json`);
+                const parsed = JSON.parse(content);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setAgents(parsed);
+                    if (!parsed.find((a: Agent) => a.id === selectedAgentId)) {
+                        const refactorAgent = parsed.find((a: Agent) => a.id === 'refactor');
+                        setSelectedAgentId(refactorAgent ? 'refactor' : parsed[0].id);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to load agents in inline prompt", err);
+            }
+        };
+        loadAgents();
+    }, [isOpen]);
+
     const { showError } = useError();
 
     const executePrompt = async () => {
@@ -63,9 +89,16 @@ export const AgentPrompt = () => {
 
         setIsThinking(true);
         try {
-            // Call the refactor agent
+            const selectedAgent = agents.find(a => a.id === selectedAgentId) || {
+                id: "refactor",
+                name: "Refactor",
+                system_prompt: "You are an expert editor. You rewrite the user's provided text according to their prompt. Return ONLY the rewritten valid Markdown. Do not include introductory or conversational text like 'Here is the rewritten text:'.",
+                model_class: "fast"
+            };
+
+            // Call the agent
             const response = await invoke<string>('invoke_agent', {
-                agentId: 'refactor',
+                agent: selectedAgent,
                 query: prompt.trim(),
                 context: ''
             });
@@ -147,9 +180,32 @@ export const AgentPrompt = () => {
                 zIndex: 100
             }}
         >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--interactive-accent)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                <Bot size={14} />
-                Glade AI
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--interactive-accent)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <Bot size={14} />
+                    Glade AI
+                </div>
+                <select 
+                    value={selectedAgentId} 
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                    style={{
+                        background: 'var(--background-primary)',
+                        border: '1px solid var(--background-modifier-border)',
+                        color: 'var(--text-primary)',
+                        borderRadius: '4px',
+                        padding: '2px 4px',
+                        fontSize: '11px',
+                        maxWidth: '120px'
+                    }}
+                >
+                    {agents.length === 0 ? (
+                        <option value="refactor">Refactor</option>
+                    ) : (
+                        agents.map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                        ))
+                    )}
+                </select>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
                 <input

@@ -9,6 +9,8 @@ pub struct Agent {
     pub name: String,
     pub system_prompt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<gemini::Tool>>,
 }
 
@@ -28,6 +30,7 @@ impl AgentRegistry {
                 id: "coordinator".to_string(),
                 name: "Coordinator".to_string(),
                 system_prompt: "You are the Glade Coordinator Agent. You help users manage their personal knowledge base. Use the provided active file context to answer questions accurately. Do not make up information.".to_string(),
+                model_class: Some("fast".to_string()),
                 tools: None,
             }
         );
@@ -38,6 +41,7 @@ impl AgentRegistry {
                 id: "refactor".to_string(),
                 name: "Refactor".to_string(),
                 system_prompt: "You are an expert editor. You rewrite the user's provided text according to their prompt. Return ONLY the rewritten valid Markdown. Do not include introductory or conversational text like 'Here is the rewritten text:'.".to_string(),
+                model_class: Some("fast".to_string()),
                 tools: None,
             }
         );
@@ -100,14 +104,11 @@ pub async fn execute_agent(
 
 #[tauri::command]
 pub async fn invoke_agent(
-    agent_id: String,
+    agent: Agent,
     query: String,
     context: String,
-    state: tauri::State<'_, AgentRegistry>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let agent = state.agents.get(&agent_id).ok_or("Agent not found")?;
-    
     let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
     
     // Explicitly load the store from disk if needed
@@ -116,11 +117,15 @@ pub async fn invoke_agent(
     let api_key_val = stores.get("gemini_api_key").ok_or("Gemini API Key not set in Settings")?;
     let api_key = api_key_val.as_str().ok_or("Invalid API Key format")?;
     
-    let model = stores.get("gemini_model")
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
-        .unwrap_or_else(|| "gemini-2.5-flash".to_string());
+    let model_class = agent.model_class.as_deref().unwrap_or("fast");
     
-    execute_agent(agent, api_key, &model, &query, &context, None).await
+    let model = match model_class {
+        "reasoning" => stores.get("model_reasoning").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-2.5-pro".to_string()),
+        "large" => stores.get("model_large").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-1.5-pro".to_string()),
+        "fast" | _ => stores.get("model_fast").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-2.5-flash".to_string()),
+    };
+    
+    execute_agent(&agent, api_key, &model, &query, &context, None).await
 }
 
 #[cfg(test)]

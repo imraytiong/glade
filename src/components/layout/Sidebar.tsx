@@ -4,9 +4,10 @@ import FileExplorer from '../FileExplorer';
 import { FrontmatterEditor } from '../FrontmatterEditor';
 import TableOfContents from '../TableOfContents';
 import { EditorHandle } from '../Editor';
+import AgentConfigPane from './AgentConfigPane';
 
 export interface SidebarProps {
-  sidebarView: 'explorer' | 'outline';
+  sidebarView: 'explorer' | 'outline' | 'agents';
   vaultPath: string | null;
   fileTree: FileNode[];
   activeFile: FileNode | null;
@@ -77,6 +78,9 @@ export default function Sidebar({
                   onNavigateHeader={(hash) => editorRef.current?.scrollToHeader(hash)} 
                 />
               </div>
+            )}
+            {sidebarView === 'agents' && (
+              <AgentConfigPane vaultPath={vaultPath} />
             )}
           </>
         ) : (

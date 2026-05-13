@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
-import { Settings, PanelLeft, Files, List, Bot } from 'lucide-react';
+import { Settings, PanelLeft, Files, List, Bot, MessageSquare } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
@@ -42,7 +42,7 @@ function App() {
   });
   
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [sidebarView, setSidebarView] = useState<'explorer' | 'outline'>('explorer');
+  const [sidebarView, setSidebarView] = useState<'explorer' | 'outline' | 'agents'>('explorer');
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState<boolean>(false);
   const [agentSidebarWidth, setAgentSidebarWidth] = useState<number>(300);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
@@ -582,10 +582,16 @@ function App() {
             }} title="Outline">
               <List size={20} />
             </button>
+            <button className={`icon-btn ${sidebarView === 'agents' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
+              if (sidebarView === 'agents' && isSidebarOpen) setIsSidebarOpen(false);
+              else { setSidebarView('agents'); setIsSidebarOpen(true); }
+            }} title="Agents">
+              <Bot size={20} />
+            </button>
             <button className={`icon-btn ${isAgentSidebarOpen ? 'active' : ''}`} onClick={() => {
               setIsAgentSidebarOpen(prev => !prev);
-            }} title="Agent">
-              <Bot size={20} />
+            }} title="Agent Chat">
+              <MessageSquare size={20} />
             </button>
           </div>
           <div className="ribbon-bottom">
@@ -722,7 +728,7 @@ function App() {
             }}
           />
           <div style={{ width: `${agentSidebarWidth}px`, flexShrink: 0, height: '100%', display: 'flex' }}>
-            <AgentSidebar activeFileContent={activeFileContent} />
+            <AgentSidebar activeFileContent={activeFileContent} vaultPath={vaultPath} />
           </div>
         </>
       )}

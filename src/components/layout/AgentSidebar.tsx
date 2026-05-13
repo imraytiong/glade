@@ -12,11 +12,17 @@ interface Message {
   content: string;
 }
 
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { Agent } from '../../types/agent';
+
 interface AgentSidebarProps {
   activeFileContent: { path: string, content: string } | null;
+  vaultPath: string | null;
 }
 
-export default function AgentSidebar({ activeFileContent }: AgentSidebarProps) {
+export default function AgentSidebar({ activeFileContent, vaultPath }: AgentSidebarProps) {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('coordinator');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +36,26 @@ export default function AgentSidebar({ activeFileContent }: AgentSidebarProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (!vaultPath) return;
+    const loadAgents = async () => {
+      try {
+        const content = await readTextFile(`${vaultPath}/.glade/agents.json`);
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAgents(parsed);
+          // If the previously selected agent doesn't exist anymore, reset it
+          if (!parsed.find((a: Agent) => a.id === selectedAgentId)) {
+            setSelectedAgentId(parsed[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load agents in sidebar", err);
+      }
+    };
+    loadAgents();
+  }, [vaultPath]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -45,8 +71,15 @@ export default function AgentSidebar({ activeFileContent }: AgentSidebarProps) {
     setIsLoading(true);
 
     try {
+      const selectedAgent = agents.find(a => a.id === selectedAgentId) || {
+        id: "coordinator",
+        name: "Coordinator",
+        system_prompt: "You are the Glade Coordinator Agent. You help users manage their personal knowledge base. Use the provided active file context to answer questions accurately. Do not make up information.",
+        model_class: "fast"
+      };
+
       const response = await invoke<string>('invoke_agent', {
-        agentId: 'coordinator',
+        agent: selectedAgent,
         query: userMessage.content,
         context: activeFileContent ? `Active File Context: ${activeFileContent.path}\n\n${activeFileContent.content}` : ''
       });
@@ -91,8 +124,31 @@ export default function AgentSidebar({ activeFileContent }: AgentSidebarProps) {
   return (
     <div className="agent-sidebar">
       <div className="agent-sidebar-header">
-        <Bot size={18} style={{ marginRight: '8px' }} />
-        <span className="sidebar-title">Glade Agent</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Bot size={18} style={{ marginRight: '8px' }} />
+          <span className="sidebar-title">Glade Agent</span>
+        </div>
+        <select 
+          value={selectedAgentId} 
+          onChange={(e) => setSelectedAgentId(e.target.value)}
+          style={{
+            background: 'var(--background-primary)',
+            border: '1px solid var(--background-modifier-border)',
+            color: 'var(--text-primary)',
+            borderRadius: '4px',
+            padding: '2px 4px',
+            fontSize: '11px',
+            maxWidth: '120px'
+          }}
+        >
+          {agents.length === 0 ? (
+            <option value="coordinator">Coordinator</option>
+          ) : (
+            agents.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))
+          )}
+        </select>
       </div>
       
       <div className="agent-messages">
