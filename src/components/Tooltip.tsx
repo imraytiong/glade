@@ -4,6 +4,9 @@ import { TooltipProvider } from '@milkdown/plugin-tooltip';
 import { useInstance } from '@milkdown/react';
 import { commandsCtx, editorViewCtx } from '@milkdown/core';
 import { toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand, toggleLinkCommand, wrapInHeadingCommand } from '@milkdown/preset-commonmark';
+import { invoke } from '@tauri-apps/api/core';
+import { Bot, Loader2 } from 'lucide-react';
+import { useError } from '../contexts/ErrorContext';
 
 export const Tooltip = () => {
     const ref = useRef<HTMLDivElement>(null);
@@ -12,6 +15,13 @@ export const Tooltip = () => {
     const [loading, getEditor] = useInstance();
     const [isEditingLink, setIsEditingLink] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
+    
+    // AI Refactor State
+    const [isRefactoring, setIsRefactoring] = useState(false);
+    const [refactorPrompt, setRefactorPrompt] = useState('');
+    const [isThinking, setIsThinking] = useState(false);
+    
+    const { showError } = useError();
 
     useEffect(() => {
         if (!ref.current) return;
@@ -25,6 +35,9 @@ export const Tooltip = () => {
         provider.onHide = () => {
             setIsEditingLink(false);
             setLinkUrl('');
+            setIsRefactoring(false);
+            setRefactorPrompt('');
+            setIsThinking(false);
         };
         tooltipProvider.current = provider;
 
@@ -46,6 +59,7 @@ export const Tooltip = () => {
 
         if (command === toggleLinkCommand) {
             setIsEditingLink(true);
+            setIsRefactoring(false);
             return;
         }
 
@@ -84,6 +98,79 @@ export const Tooltip = () => {
         }
     };
 
+    const applyRefactor = async () => {
+        if (loading || !refactorPrompt.trim()) return;
+        
+        setIsThinking(true);
+        let selectedText = '';
+        
+        getEditor().action((ctx) => {
+            const v = ctx.get(editorViewCtx);
+            const { state } = v;
+            const { from, to } = state.selection;
+            selectedText = state.doc.textBetween(from, to, '\n');
+        });
+
+        try {
+            const fullPrompt = `${refactorPrompt}\n\n[Selected Text to Refactor]\n${selectedText}`;
+            
+            const response = await invoke<string>('invoke_agent', {
+                agentId: 'refactor',
+                query: fullPrompt,
+                context: ''
+            });
+
+            const editor = getEditor();
+            if (editor) {
+                editor.action((ctx) => {
+                    const v = ctx.get(editorViewCtx);
+                    const { state, dispatch } = v;
+                    const { from, to } = state.selection;
+                    
+                    // Replace selected text
+                    const tr = state.tr.replaceWith(
+                        from,
+                        to,
+                        state.schema.text(response)
+                    );
+                    dispatch(tr);
+                    v.focus();
+                });
+            }
+        } catch (err) {
+            console.error('Agent Refactor Error:', err);
+            
+            let friendlyMessage = "An unexpected error occurred while refactoring text.";
+            let errorCode = "UNKNOWN_ERROR";
+            const errorStr = String(err);
+            
+            if (errorStr.includes("Gemini API Key not set")) {
+                friendlyMessage = "Could not connect to the AI Agent. Please check that your Gemini API key is configured correctly in Settings.";
+                errorCode = "MISSING_API_KEY";
+            } else if (errorStr.includes("401 Unauthorized")) {
+                friendlyMessage = "Your API key is invalid or unauthorized. Please check your Gemini API key in Settings.";
+                errorCode = "UNAUTHORIZED";
+            } else if (errorStr.includes("503") || errorStr.includes("Service overloaded")) {
+                friendlyMessage = "The AI service is currently overloaded or unavailable. Please try again later.";
+                errorCode = "SERVICE_UNAVAILABLE";
+            }
+
+            showError({
+                title: "Refactor Error",
+                friendlyMessage,
+                details: errorStr,
+                errorCode
+            });
+        } finally {
+            setIsThinking(false);
+            setIsRefactoring(false);
+            setRefactorPrompt('');
+            if (tooltipProvider.current) {
+                tooltipProvider.current.hide();
+            }
+        }
+    };
+
     return (
         <div ref={ref} className="glade-tooltip" data-show="false">
             {isEditingLink ? (
@@ -116,8 +203,59 @@ export const Tooltip = () => {
                     <button onMouseDown={(e) => { e.preventDefault(); applyLink(); }}>Apply</button>
                     <button onMouseDown={(e) => { e.preventDefault(); setIsEditingLink(false); setLinkUrl(''); }}>Cancel</button>
                 </div>
+            ) : isRefactoring ? (
+                <div style={{ display: 'flex', padding: '4px', gap: '4px', alignItems: 'center' }}>
+                    <Bot size={14} style={{ color: 'var(--interactive-accent)' }} />
+                    <input
+                        type="text"
+                        placeholder="Rewrite to be more professional..."
+                        value={refactorPrompt}
+                        onChange={(e) => setRefactorPrompt(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                applyRefactor();
+                            } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setIsRefactoring(false);
+                                setRefactorPrompt('');
+                            }
+                        }}
+                        autoFocus
+                        disabled={isThinking}
+                        style={{
+                            background: 'transparent',
+                            border: '1px solid #555',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            outline: 'none',
+                            width: '200px'
+                        }}
+                    />
+                    {isThinking ? (
+                        <Loader2 size={14} className="spin" style={{ color: 'var(--interactive-accent)' }} />
+                    ) : (
+                        <>
+                            <button onMouseDown={(e) => { e.preventDefault(); applyRefactor(); }}>Refactor</button>
+                            <button onMouseDown={(e) => { e.preventDefault(); setIsRefactoring(false); setRefactorPrompt(''); }}>Cancel</button>
+                        </>
+                    )}
+                </div>
             ) : (
                 <>
+                    <button 
+                        onMouseDown={(e) => { 
+                            e.preventDefault(); 
+                            setIsRefactoring(true); 
+                            setIsEditingLink(false);
+                        }}
+                        title="Refactor with AI"
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--interactive-accent)' }}
+                    >
+                        <Bot size={14} /> AI
+                    </button>
+                    <span style={{ borderLeft: '1px solid #555', margin: '0 4px' }} />
                     <button onMouseDown={(e) => handleFormat(e, toggleStrongCommand)}>Bold</button>
                     <button onMouseDown={(e) => handleFormat(e, toggleEmphasisCommand)}>Italic</button>
                     <button onMouseDown={(e) => handleFormat(e, toggleInlineCodeCommand)}>Code</button>

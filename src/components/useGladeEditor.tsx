@@ -19,6 +19,7 @@ import { Slash } from './Slash';
 import { WikiLink } from './WikiLink';
 import { EmojiPicker } from './EmojiPicker';
 import { CustomImage } from './CustomImage';
+import { AgentPrompt } from './AgentPrompt';
 import { search } from 'prosemirror-search';
 
 import { emoji } from '@milkdown/plugin-emoji';
@@ -31,6 +32,7 @@ const linkTooltipPlugin = tooltipFactory('LINK_TOOLTIP');
 const slashPlugin = slashFactory('SLASH');
 const wikiLinkPlugin = slashFactory('WIKILINK');
 const emojiPickerPlugin = slashFactory('EMOJIPICKER');
+const agentSlashPlugin = slashFactory('AGENT_SLASH');
 
 const dragDropFixPlugin = $prose(() => new Plugin({
   props: {
@@ -110,6 +112,12 @@ export function useGladeEditor(props: EditorProps) {
           })
         });
 
+        ctx.set(agentSlashPlugin.key, {
+          view: pluginViewFactory({
+            component: AgentPrompt
+          })
+        });
+
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
           if (markdown !== prevMarkdown) {
             props.onSave(markdown);
@@ -146,6 +154,7 @@ export function useGladeEditor(props: EditorProps) {
       .use(slashPlugin)
       .use(wikiLinkPlugin)
       .use(emojiPickerPlugin)
+      .use(agentSlashPlugin)
       .use(searchPlugin)
       .use(prism)
       .use(trailing)

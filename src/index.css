@@ -152,3 +152,6 @@ html, body, #root {
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
+
+.agent-prompt-menu[data-show="false"] { display: none !important; }
+.agent-prompt-menu[data-show="true"] { display: block !important; }

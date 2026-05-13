@@ -5,7 +5,12 @@ import { useInstance } from '@milkdown/react';
 import { commandsCtx, editorViewCtx } from '@milkdown/core';
 import { createCodeBlockCommand, turnIntoTextCommand, wrapInHeadingCommand, wrapInBlockquoteCommand, wrapInBulletListCommand, wrapInOrderedListCommand, insertHrCommand } from '@milkdown/preset-commonmark';
 
-const ALL_ITEMS = [
+const ALL_ITEMS: Array<{ label: string; command?: any; payload?: any; action?: (v: any) => void }> = [
+    { label: 'Glade AI', action: () => {
+        setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('open-agent-prompt'));
+        }, 50);
+    }},
     { label: 'Text', command: turnIntoTextCommand },
     { label: 'Heading 1', command: wrapInHeadingCommand, payload: 1 },
     { label: 'Heading 2', command: wrapInHeadingCommand, payload: 2 },
@@ -100,10 +105,17 @@ export const Slash = () => {
             
             const len = filter.length + 1; 
             const tr = state.tr.delete(state.selection.from - len, state.selection.from);
-            dispatch(tr);
-
-            const commands = ctx.get(commandsCtx);
-            commands.call(item.command.key, item.payload);
+            
+            if (item.action) {
+                // Apply the deletion transaction first
+                dispatch(tr);
+                // Then run the action
+                item.action(v);
+            } else if (item.command) {
+                dispatch(tr);
+                const commands = ctx.get(commandsCtx);
+                commands.call(item.command.key, item.payload);
+            }
             
             v.focus();
         });

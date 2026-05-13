@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
-import { Settings, PanelLeft, Files, List } from 'lucide-react';
+import { Settings, PanelLeft, Files, List, Bot } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';
 import { Command } from './utils/commands';
@@ -16,6 +16,7 @@ import BacklinksPane from './components/BacklinksPane';
 import SettingsDialog from './components/SettingsDialog';
 import ConfirmDeleteModal from './components/ConfirmDeleteModal';
 import Sidebar from './components/layout/Sidebar';
+import AgentSidebar from './components/layout/AgentSidebar';
 import './App.css';
 
 function extractFrontmatter(content: string) {
@@ -42,6 +43,8 @@ function App() {
   
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [sidebarView, setSidebarView] = useState<'explorer' | 'outline'>('explorer');
+  const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState<boolean>(false);
+  const [agentSidebarWidth, setAgentSidebarWidth] = useState<number>(300);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   
@@ -579,6 +582,11 @@ function App() {
             }} title="Outline">
               <List size={20} />
             </button>
+            <button className={`icon-btn ${isAgentSidebarOpen ? 'active' : ''}`} onClick={() => {
+              setIsAgentSidebarOpen(prev => !prev);
+            }} title="Agent">
+              <Bot size={20} />
+            </button>
           </div>
           <div className="ribbon-bottom">
             <button className="icon-btn" onClick={() => setIsSettingsOpen(true)} title="Settings">
@@ -682,6 +690,42 @@ function App() {
           </div>
         )}
       </div>
+
+      {isAgentSidebarOpen && !isZenMode && (
+        <>
+          <div 
+            className="sidebar-resizer right-resizer"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = agentSidebarWidth;
+              
+              const onMouseMove = (moveEvent: MouseEvent) => {
+                const newWidth = Math.max(200, Math.min(800, startWidth - (moveEvent.clientX - startX)));
+                setAgentSidebarWidth(newWidth);
+              };
+              
+              const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+              };
+              
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            }}
+            style={{
+              width: '4px',
+              cursor: 'col-resize',
+              background: 'transparent',
+              position: 'relative',
+              zIndex: 10
+            }}
+          />
+          <div style={{ width: `${agentSidebarWidth}px`, flexShrink: 0, height: '100%', display: 'flex' }}>
+            <AgentSidebar activeFileContent={activeFileContent} />
+          </div>
+        </>
+      )}
 
       <CommandPalette 
         isOpen={isCommandPaletteOpen}

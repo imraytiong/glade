@@ -1,5 +1,7 @@
-use walkdir::WalkDir;
+mod agent;
+mod gemini;
 
+use walkdir::WalkDir;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -26,12 +28,19 @@ fn list_md_files(dir: &str) -> Result<Vec<String>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, list_md_files])
+        .manage(agent::AgentRegistry::new())
+        .invoke_handler(tauri::generate_handler![greet, list_md_files, agent::invoke_agent])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

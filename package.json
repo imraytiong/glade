@@ -35,6 +35,7 @@
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "gemoji": "^8.1.0",
@@ -44,7 +45,9 @@
     "prosemirror-suggest": "^3.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
     "remark-frontmatter": "^4.0.1",
+    "remark-gfm": "^4.0.1",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

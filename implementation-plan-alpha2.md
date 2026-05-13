@@ -102,14 +102,63 @@ We will introduce the dual-paradigm UX for interacting with the agents.
 
 ---
 
+### Phase 5: Agent Instrumentation & Headless Testing
+
+We will instrument the Rust MAS codebase to establish **Agentic Observability as the Highest Priority**. Over speed or performance, our goal is to emit extensive, machine-readable telemetry designed specifically for agentic coding tools (like Antigravity) to parse, troubleshoot, and self-correct with minimal human intervention. This involves decoupling the core agent execution logic from the Tauri state management, allowing us to write exhaustive End-to-End (E2E) integration tests that output rich structural traces.
+
+We will use a **Two-Level Testing Strategy**:
+
+#### Level 1: Mocked Service Testing (Fast & Deterministic)
+Introduce a mock HTTP client (e.g., `wiremock` or mock server) to intercept Gemini API calls during tests.
+- **Error Conditions**: Simulate `401 Unauthorized`, `503 Service Unavailable`, `429 Too Many Requests`.
+- **Malformed Data**: Simulate API returning malformed JSON.
+- **Unexpected LLM Behavior**: Simulate hallucinations or empty responses.
+
+#### Level 2: Real LLM Backed E2E Testing (Expensive but Realistic)
+Run true End-to-End tests backed by a real `GEMINI_API_KEY` (gated behind an environment variable like `RUN_LIVE_LLM_TESTS=1`).
+- **Test Scenarios:**
+  - **Scenario A (Coordinator Routing):** Verify the Coordinator properly synthesizes a response using injected Markdown context.
+  - **Scenario B (Refactor Agent Formatting):** Verify the Refactor agent returns strictly formatted markdown without conversational filler text.
+
+#### [MODIFY] `src-tauri/src/agent/mod.rs` & `src-tauri/src/gemini/mod.rs`
+- Decouple the core execution logic from Tauri `AppHandle` and `State`, extracting it into a pure `execute_agent` async function that supports injecting a custom HTTP client or overriding the API URL.
+- Add structural telemetry (using the `tracing` crate) to log agent prompts, API latencies, and tool usage safely.
+- Implement exhaustive headless tests using `tokio::test`.
+
+---
+
 ## Verification Plan
 
-### Automated Tests
-- Build Rust unit tests for the custom Agent Harness to ensure tool-calling JSON schemas are generated perfectly for Gemini.
-- Mock the HTTP client to test the Orchestration routing (Coordinator -> Retrieval -> Writer) locally.
+Our verification plan demands exhaustive coverage of all Alpha 2 features across the full stack. This includes Headless Integration Tests (for the backend) and UI E2E / Manual Tests (for user-facing features), covering happy paths, corner cases, and error permutations.
 
-### Manual Verification
-1. Launch the app and input a valid Gemini API key in Settings via `tauri-plugin-store`.
-2. Open the Right Sidebar, ask a question about the currently open document, and verify the model cites the document accurately.
-3. Highlight a paragraph in the editor, trigger the inline agent, ask it to "Rewrite this to be more professional," and verify the text is replaced seamlessly.
-4. Ask the agent in the sidebar to "Create a new note called Task List", and verify the file appears in the left sidebar explorer.
+### 1. API Configuration & Authentication
+*   **Happy Path:** User saves a valid `GEMINI_API_KEY` in settings. Agent calls succeed.
+*   **Error (No Key):** User attempts an agent call without a configured key. Verify clear UI error asking for configuration.
+*   **Error (Invalid Key):** User saves a malformed key. Verify HTTP 401 is gracefully caught and a user-friendly error is surfaced.
+*   **Security (Scrubbing):** Inspect the raw JSON telemetry logs to guarantee the `GEMINI_API_KEY` is scrubbed and never persisted to disk or standard output.
+
+### 2. The Agent Command Center (Sidebar Chat)
+*   **Happy Path:** User asks a general question. Agent streams the response into a new chat bubble.
+*   **Context Injection:** User opens a document containing specific facts, asks "What does this document say?", and the agent cites the document.
+*   **Corner Case (Empty Context):** User asks a question with no active document open. Agent handles it as a zero-shot general query.
+*   **Corner Case (Token Limit Exceeded):** Active document is an massive text file exceeding context windows. Verify the system either truncates intelligently or surfaces a "Context Too Large" error rather than crashing.
+*   **Error (Service Outage):** Mock a 503 response mid-chat. Verify the UI displays a network error message in the chat log instead of hanging indefinitely.
+*   **UI State:** Verify sidebar visibility toggles correctly and retains its state across reloads.
+
+### 3. Inline Editor Prompts (`/agent` Generative Command)
+*   **Happy Path:** User types `/agent Write a summary`, presses Enter. The popup shows a loading state, and the `/agent` text is replaced by the streamed markdown response.
+*   **Corner Case (Cancellation):** User types `/agent`, opens the popup, but presses `ESC`. Verify the popup closes and the editor cursor returns to the text seamlessly.
+*   **Corner Case (Loss of Focus):** User opens the prompt, then clicks elsewhere in the document. The popup should dismiss without altering the document.
+*   **Edge Case (Nested Blocks):** User types `/agent` inside a blockquote or a deeply nested list. Verify the generated text inherits the correct block formatting.
+*   **Error Handling:** If the Gemini API returns a 500 error during generation, verify the `/agent` prompt block is either preserved for retry or cleaned up gracefully, ensuring the Prosemirror transaction history is not corrupted.
+
+### 4. Contextual Tooltip Refactoring (Selection-based)
+*   **Happy Path:** User highlights a paragraph, clicks the "AI" button, types "Make shorter", presses Enter. The exact highlighted selection is replaced with the shorter version.
+*   **Corner Case (Multi-Block Selection):** User highlights text spanning across multiple paragraphs, headings, and lists. Verify the RAG context accurately captures the complex selection and replaces the entire multi-block selection cleanly.
+*   **Corner Case (Single Character Selection):** User highlights a single letter and clicks AI. Verify it still attempts the operation or provides a sensible prompt constraint.
+*   **Error (Reversion):** If the LLM call fails, verify the selected text is NOT deleted. The user must not lose their original text due to an API timeout.
+*   **UI Cancellation:** User clicks the AI button to enter refactor mode, but clicks the "X" or presses `ESC`. The tooltip should revert to the standard bold/italic formatting menu.
+
+### 5. Telemetry & Agentic Observability (Headless)
+*   **Trace Validation:** Run headless test suites and parse the outputting `tracing` JSON. Assert that fields like `agent_id`, `latency_ms`, `prompt_tokens`, and `completion_tokens` are consistently present.
+*   **Mocked Pipeline Exhaustion:** Run Level 1 tests looping through 100 concurrent mocked agent requests to verify the Rust async harness handles backpressure and doesn't leak memory.
