@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useSettings } from '../utils/settings';
-import { load } from '@tauri-apps/plugin-store';
-import { invoke } from '@tauri-apps/api/core';
+import { load } from '../utils/store';
+import { invoke } from '../utils/api';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -36,11 +36,11 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
       if (vaultPath) {
           // Attempt to load mcp_servers.json from .glade folder using a Tauri command or similar...
           // For now we'll just read it using tauri fs plugin
-          import('@tauri-apps/plugin-fs').then(({ readTextFile, exists }) => {
+          import('../utils/fs').then(({ readTextFile, exists }) => {
               const mcpPath = `${vaultPath}/.glade/mcp_servers.json`;
-              exists(mcpPath).then(doesExist => {
+              exists(mcpPath).then((doesExist: boolean) => {
                   if (doesExist) {
-                      readTextFile(mcpPath).then(content => setMcpServersConfig(content)).catch(console.error);
+                      readTextFile(mcpPath).then((content: string) => setMcpServersConfig(content)).catch(console.error);
                   }
               });
           });
@@ -110,7 +110,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
     if (!vaultPath) return;
     
     try {
-        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        const { writeTextFile } = await import('../utils/fs');
         await writeTextFile(`${vaultPath}/.glade/mcp_servers.json`, mcpServersConfig);
         await invoke('reload_mcp_servers', { vaultPath });
         alert("MCP Configuration saved! The backend has reloaded the MCP servers.");

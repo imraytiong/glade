@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { readTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile } from '../utils/fs';
 import { join } from '@tauri-apps/api/path';
 
 export const HoverPreview = ({ workspaceRoot }: { workspaceRoot: string }) => {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../utils/api';
 import { Send, Bot, User } from 'lucide-react';
 import { useError } from '../../contexts/ErrorContext';
 import ReactMarkdown from 'react-markdown';

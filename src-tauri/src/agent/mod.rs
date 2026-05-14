@@ -148,8 +148,7 @@ pub async fn delete_agent(vault_path: String, agent_id: String) -> Result<(), St
     Ok(())
 }
 
-#[tauri::command]
-pub async fn get_available_tools(app_handle: tauri::AppHandle) -> Result<Vec<ToolInfo>, String> {
+pub async fn get_available_tools_inner(mcp_manager: &crate::mcp::McpManager) -> Result<Vec<ToolInfo>, String> {
     let mut tools = vec![
         ToolInfo {
             name: "read_file".to_string(),
@@ -173,7 +172,6 @@ pub async fn get_available_tools(app_handle: tauri::AppHandle) -> Result<Vec<Too
         },
     ];
     
-    let mcp_manager = app_handle.state::<crate::mcp::McpManager>();
     if let Ok(mcp_tools) = mcp_manager.list_all_tools().await {
         for (name, (server_name, tool)) in mcp_tools {
             tools.push(ToolInfo {
@@ -185,6 +183,12 @@ pub async fn get_available_tools(app_handle: tauri::AppHandle) -> Result<Vec<Too
     
     tools.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(tools)
+}
+
+#[tauri::command]
+pub async fn get_available_tools(app_handle: tauri::AppHandle) -> Result<Vec<ToolInfo>, String> {
+    let mcp_manager = app_handle.state::<crate::mcp::McpManager>();
+    get_available_tools_inner(&mcp_manager).await
 }
 
 #[derive(serde::Serialize)]
@@ -373,14 +377,11 @@ pub async fn execute_agent(
     Err(format!("Agent exceeded maximum iterations ({})", max_iterations))
 }
 
-#[tauri::command]
-pub async fn invoke_agent(
-    agent: Agent,
-    messages: Vec<ChatMessage>,
-    context: String,
+async fn prepare_agent_execution(
+    agent: &Agent,
     vault_path: Option<String>,
     app_handle: tauri::AppHandle,
-) -> Result<String, String> {
+) -> Result<(String, String, HashMap<String, Box<dyn tools::ToolExecutor>>, Agent), String> {
     let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
     
     // Explicitly load the store from disk if needed
@@ -598,13 +599,187 @@ pub async fn invoke_agent(
         }
     }
     
+    Ok((api_key.to_string(), model, executors, final_agent))
+}
+
+#[tauri::command]
+pub async fn invoke_agent(
+    agent: Agent,
+    messages: Vec<ChatMessage>,
+    context: String,
+    vault_path: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle).await?;
+    
     let augmented_context = if let Some(ref vp) = vault_path {
         format!("Vault Absolute Path: {}\n{}", vp, context)
     } else {
         context
     };
 
-    execute_agent(&final_agent, api_key, &model, &messages, &augmented_context, None, Some(&executors)).await
+    execute_agent(&final_agent, &api_key, &model, &messages, &augmented_context, None, Some(&executors)).await
+}
+
+pub fn execute_agent_stream(
+    agent: Agent,
+    api_key: String,
+    model: String,
+    messages: Vec<ChatMessage>,
+    context: String,
+    base_url: Option<String>,
+    tool_executors: Option<std::sync::Arc<HashMap<String, Box<dyn tools::ToolExecutor>>>>,
+) -> impl futures::stream::Stream<Item = Result<String, String>> {
+    async_stream::stream! {
+        tracing::info!(
+            target: "agent_execution",
+            agent_id = %agent.id,
+            model = %model,
+            "Executing agent stream"
+        );
+
+        let mut history_contents = vec![];
+        
+        if !context.is_empty() {
+            history_contents.push(Content {
+                role: "user".to_string(),
+                parts: vec![Part::Text(format!("Active Document Context:\n{}\n\n", context))],
+            });
+        }
+        
+        for msg in messages {
+            let role = if msg.role == "agent" { "model" } else { "user" };
+            history_contents.push(Content {
+                role: role.to_string(),
+                parts: vec![Part::Text(msg.content.clone())],
+            });
+        }
+        
+        let system_instruction = Some(SystemInstruction {
+            parts: vec![Part::Text(agent.system_prompt.clone())]
+        });
+
+        let max_iterations = 10;
+        
+        for _ in 0..max_iterations {
+            let request = GeminiRequest {
+                contents: history_contents.clone(),
+                system_instruction: system_instruction.clone(),
+                tools: agent.tools.clone(),
+            };
+            
+            let stream = match crate::gemini::call_gemini_stream(&api_key, &model, &request, base_url.as_deref()) {
+                Ok(s) => s,
+                Err(e) => {
+                    yield Err(e);
+                    break;
+                }
+            };
+            
+            use futures::stream::StreamExt;
+            tokio::pin!(stream);
+            let mut full_text = String::new();
+            let mut function_calls = Vec::new();
+            
+            while let Some(chunk_res) = stream.next().await {
+                match chunk_res {
+                    Ok(resp) => {
+                        if let Some(mut candidates) = resp.candidates {
+                            if let Some(candidate) = candidates.pop() {
+                                if let Some(mut content) = candidate.content {
+                                    if let Some(parts) = content.parts.take() {
+                                        for part in parts {
+                                            if let Some(text) = part.text {
+                                                full_text.push_str(&text);
+                                                yield Ok(text.clone());
+                                            } else if let Some(fc) = part.function_call {
+                                                function_calls.push(fc);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+            
+            let mut model_parts = Vec::new();
+            if !full_text.is_empty() {
+                model_parts.push(Part::Text(full_text));
+            }
+            for fc in &function_calls {
+                model_parts.push(Part::FunctionCall(fc.clone()));
+            }
+            
+            history_contents.push(Content {
+                role: "model".to_string(),
+                parts: model_parts,
+            });
+            
+            if function_calls.is_empty() {
+                break;
+            }
+            
+            let mut function_response_parts = Vec::new();
+            for fc in function_calls {
+                yield Ok(format!("\n\n*Running tool {}...*\n\n", fc.name));
+                
+                let result_val = if let Some(executors) = &tool_executors {
+                    if let Some(executor) = executors.get(&fc.name) {
+                        match executor.execute(fc.args.clone()).await {
+                            Ok(res) => res,
+                            Err(e) => serde_json::json!({"error": e}),
+                        }
+                    } else {
+                        serde_json::json!({"error": format!("Tool '{}' not found", fc.name)})
+                    }
+                } else {
+                    serde_json::json!({"error": format!("No tool executors provided to handle '{}'", fc.name)})
+                };
+                
+                function_response_parts.push(Part::FunctionResponse(FunctionResponse {
+                    name: fc.name,
+                    response: result_val,
+                }));
+            }
+            
+            history_contents.push(Content {
+                role: "user".to_string(),
+                parts: function_response_parts,
+            });
+        }
+    }
+}
+
+pub async fn invoke_agent_stream(
+    agent: Agent,
+    messages: Vec<ChatMessage>,
+    context: String,
+    vault_path: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<impl futures::stream::Stream<Item = Result<String, String>>, String> {
+    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle).await?;
+    
+    let augmented_context = if let Some(ref vp) = vault_path {
+        format!("Vault Absolute Path: {}\n{}", vp, context)
+    } else {
+        context
+    };
+
+    Ok(execute_agent_stream(
+        final_agent,
+        api_key,
+        model,
+        messages,
+        augmented_context,
+        None,
+        Some(std::sync::Arc::new(executors))
+    ))
 }
 
 #[cfg(test)]

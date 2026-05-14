@@ -4,6 +4,7 @@ use std::fs;
 
 #[async_trait]
 pub trait ToolExecutor: Send + Sync {
+    #[allow(dead_code)]
     /// Returns the name of the tool
     fn name(&self) -> &str;
     

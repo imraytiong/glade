@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from './utils/fs';
 import { Settings, PanelLeft, Files, List, Bot, MessageSquare } from 'lucide-react';
 import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
 import { globalIndexer } from './utils/indexer';

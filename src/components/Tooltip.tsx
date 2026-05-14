@@ -4,7 +4,7 @@ import { TooltipProvider } from '@milkdown/plugin-tooltip';
 import { useInstance } from '@milkdown/react';
 import { commandsCtx, editorViewCtx } from '@milkdown/core';
 import { toggleStrongCommand, toggleEmphasisCommand, toggleInlineCodeCommand, toggleLinkCommand, wrapInHeadingCommand } from '@milkdown/preset-commonmark';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../utils/api';
 import { Bot, Loader2 } from 'lucide-react';
 import { useError } from '../contexts/ErrorContext';
 

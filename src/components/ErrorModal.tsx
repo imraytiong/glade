@@ -9,10 +9,19 @@ export interface AppError {
 }
 
 interface ErrorModalProps {
+  /** The error object to display. If null, the modal will not be shown. */
   error: AppError | null;
+  /** Callback function to be called when the modal is closed. */
   onClose: () => void;
 }
 
+/**
+ * A modal component to display application errors.
+ * It can show a friendly message, a title, and optional detailed information and an error code.
+ *
+ * @param {ErrorModalProps} props - The props for the ErrorModal component.
+ * @returns {JSX.Element | null} The ErrorModal component, or null if no error is provided.
+ */
 const ErrorModal: React.FC<ErrorModalProps> = ({ error, onClose }) => {
   const [showDetails, setShowDetails] = useState(false);
 

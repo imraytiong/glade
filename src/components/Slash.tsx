@@ -25,6 +25,14 @@ const ALL_ITEMS: Array<{ label: string; command?: any; payload?: any; action?: (
     { label: 'Divider', command: insertHrCommand },
 ];
 
+/**
+ * Slash component for Milkdown editor.
+ * Provides an autocompletion/suggestion menu that appears when the user types '/' (slash).
+ * It offers a list of common commands like text formatting, list creation, code blocks, and access to Glade AI.
+ *
+ * @component
+ * @returns {JSX.Element} The Slash component, rendering a suggestion menu for editor commands.
+ */
 export const Slash = () => {
     const ref = useRef<HTMLDivElement>(null);
     const { view, prevState } = usePluginViewContext();

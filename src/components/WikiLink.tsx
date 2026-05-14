@@ -6,6 +6,16 @@ import { editorViewCtx } from '@milkdown/core';
 import { globalIndexer } from '../utils/indexer';
 import { fetch } from '@tauri-apps/plugin-http';
 
+/**
+ * WikiLink component for Milkdown editor.
+ * Provides an autocompletion/suggestion menu for wiki-style links ([[link]]) and external URLs.
+ * It fetches local markdown files for suggestions and attempts to resolve titles for HTTP links.
+ *
+ * @component
+ * @param {object} props - The component props.
+ * @param {string} props.workspaceRoot - The absolute path to the workspace root, used for resolving file paths and indexing local markdown files.
+ * @returns {JSX.Element} The WikiLink component, rendering a suggestion menu for links.
+ */
 export const WikiLink = ({ workspaceRoot }: { workspaceRoot: string }) => {
     const ref = useRef<HTMLDivElement>(null);
     const { view, prevState } = usePluginViewContext();
@@ -158,7 +168,7 @@ export const WikiLink = ({ workspaceRoot }: { workspaceRoot: string }) => {
             
             // Extract filename without extension for the label
             const isHttp = item.startsWith('http://') || item.startsWith('https://');
-            const filename = isHttp ? (resolvedTitle || item) : (item.split('/').pop()?.replace(/\.md$/, '') || item);
+            const filename = isHttp ? (resolvedTitle || item) : (item.split('/').pop()?.replace(/\\.md$/, '') || item);
             
             // Insert the text and add the link mark
             const markType = state.schema.marks.link;

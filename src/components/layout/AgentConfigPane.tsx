@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../utils/api';
 import { Plus, Trash2, Save, RefreshCw } from 'lucide-react';
 
 export interface Agent {

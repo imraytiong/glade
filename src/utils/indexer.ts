@@ -1,4 +1,4 @@
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeTextFile } from './fs';
 import { FileNode } from './fs';
 
 export interface LinkData {

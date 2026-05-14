@@ -3,7 +3,7 @@ import { usePluginViewContext } from '@prosemirror-adapter/react';
 import { useInstance } from '@milkdown/react';
 import { editorViewCtx } from '@milkdown/core';
 import { replaceRange } from '@milkdown/utils';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../utils/api';
 import { Bot, Loader2 } from 'lucide-react';
 import { useError } from '../contexts/ErrorContext';
 

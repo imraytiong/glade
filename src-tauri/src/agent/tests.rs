@@ -43,7 +43,7 @@ async fn test_mock_coordinator_routing_success() {
         agent,
         "dummy_key",
         "gemini-1.5-flash",
-        "What does the document say?",
+        &[ChatMessage { role: "user".into(), content: "What does the document say?".into() }],
         "This document is about testing.",
         Some(&base_url),
         None
@@ -72,7 +72,7 @@ async fn test_mock_401_unauthorized() {
         agent,
         "invalid_key",
         "gemini-1.5-flash",
-        "Query",
+        &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
         None
@@ -102,7 +102,7 @@ async fn test_mock_503_service_unavailable() {
         agent,
         "dummy_key",
         "gemini-1.5-flash",
-        "Query",
+        &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
         None
@@ -131,7 +131,7 @@ async fn test_mock_malformed_json_response() {
         agent,
         "dummy_key",
         "gemini-1.5-flash",
-        "Query",
+        &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
         None
@@ -162,7 +162,7 @@ async fn test_mock_empty_llm_response() {
         agent,
         "dummy_key",
         "gemini-1.5-flash",
-        "Query",
+        &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
         None
@@ -192,7 +192,7 @@ async fn test_live_coordinator_routing() {
         agent,
         &api_key,
         "gemini-1.5-flash",
-        "What is the secret word in the document?",
+        &[ChatMessage { role: "user".into(), content: "What is the secret word in the document?".into() }],
         "The secret word is 'Antigravity'.",
         None,
         None
@@ -219,7 +219,7 @@ async fn test_live_refactor_formatting() {
         agent,
         &api_key,
         "gemini-1.5-flash",
-        "Make this a bulleted list: apple, banana, cherry",
+        &[ChatMessage { role: "user".into(), content: "Make this a bulleted list: apple, banana, cherry".into() }],
         "",
         None,
         None

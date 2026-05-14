@@ -5,15 +5,27 @@ import { FileText, Search, Terminal } from 'lucide-react';
 import './CommandPalette.css';
 
 interface CommandPaletteProps {
+  /** Whether the command palette is currently open. */
   isOpen: boolean;
+  /** The initial mode of the command palette (files, commands, or link). */
   initialMode: 'files' | 'commands' | 'link';
+  /** Callback function to be called when the command palette is closed. */
   onClose: () => void;
+  /** A list of available files to display for file searching. */
   files: FileNode[];
+  /** A list of available commands to display for command searching. */
   commands: Command[];
+  /** Callback function to be called when a file is selected. */
   onFileSelect: (file: FileNode) => void;
+  /** A map of hotkey IDs to their string representations. */
   hotkeys: Record<string, string>;
 }
 
+/**
+ * Formats a hotkey string for display, replacing common modifiers with their symbols.
+ * @param {string} hotkey - The raw hotkey string.
+ * @returns {string} The formatted hotkey string.
+ */
 const formatHotkey = (hotkey: string) => {
   return hotkey
     .replace(/Cmd/ig, '⌘')
@@ -23,6 +35,15 @@ const formatHotkey = (hotkey: string) => {
     .replace(/\+/g, '');
 };
 
+/**
+ * The CommandPalette component provides a searchable interface for files and commands.
+ * Users can switch between searching files and executing commands using prefixes.
+ * It supports keyboard navigation and hotkey display for commands.
+ *
+ * @component
+ * @param {CommandPaletteProps} props - The props for the CommandPalette component.
+ * @returns {JSX.Element | null} The CommandPalette component, or null if it's not open, rendering a searchable modal.
+ */
 const CommandPalette: React.FC<CommandPaletteProps> = ({ 
   isOpen, 
   initialMode, 

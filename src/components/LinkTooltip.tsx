@@ -4,6 +4,12 @@ import { TooltipProvider } from '@milkdown/plugin-tooltip';
 import { useInstance } from '@milkdown/react';
 import { editorViewCtx } from '@milkdown/core';
 
+/**
+ * Helper function to get the range of a mark at a given position.
+ * @param {$pos} $pos - The resolved position in the editor state.
+ * @param {any} type - The mark type to look for.
+ * @returns {object | null} An object containing `from`, `to` (absolute positions) and the `mark` itself, or null if no mark is found.
+ */
 function getMarkRange($pos: any, type: any) {
     if (!$pos || !type) return null;
 
@@ -32,6 +38,14 @@ function getMarkRange($pos: any, type: any) {
     return expandMarkRange($pos, mark, start.offset);
 }
 
+/**
+ * Helper function to expand the range of a given mark.
+ * This ensures the entire mark is covered, even if the initial $pos is only within a part of it.
+ * @param {$pos} $pos - The resolved position in the editor state.
+ * @param {any} mark - The mark instance to expand around.
+ * @param {number} startOffset - The starting offset of the node containing the mark within its parent.
+ * @returns {object | null} An object containing `from`, `to` (absolute positions) and the `mark` itself, or null if the position is not within the mark.
+ */
 function expandMarkRange($pos: any, mark: any, startOffset: number) {
     let startIndex = $pos.index();
     let startPos = $pos.start() + startOffset;
@@ -68,6 +82,14 @@ function expandMarkRange($pos: any, mark: any, startOffset: number) {
     return { from: markStart, to: markEnd, mark };
 }
 
+/**
+ * LinkTooltip component for Milkdown editor.
+ * This component provides an inline tooltip that appears when the user's cursor is within a link.
+ * It allows users to view, edit, or remove the link's text and URL.
+ *
+ * @component
+ * @returns {JSX.Element} The LinkTooltip component, rendering an editable tooltip for links.
+ */
 export const LinkTooltip = () => {
     const ref = useRef<HTMLDivElement>(null);
     const { view, prevState } = usePluginViewContext();

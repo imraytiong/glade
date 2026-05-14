@@ -25,8 +25,13 @@ test.describe('Agent Persona Framework', () => {
             skills_allowed: []
           }
         ],
-        availableTools: ['read_file', 'mcpServer::tool'],
-        availableSkills: ['.agents/skills/custom_skill']
+        availableTools: [
+          { name: 'read_file', description: 'Read file' },
+          { name: 'mcpServer::tool', description: 'MCP Tool' }
+        ],
+        availableSkills: [
+          { id: '.agents/skills/custom_skill', name: 'custom_skill', description: 'Custom Skill' }
+        ]
       };
 
       // Mock Tauri IPC using __TAURI_INTERNALS__ which v2 uses
@@ -144,7 +149,7 @@ test.describe('Agent Persona Framework', () => {
     await expect(mcpCheckbox).not.toBeChecked();
 
     // We expect 'custom_skill' to exist
-    const skillCheckbox = page.locator('label:has-text(".agents/skills/custom_skill") input[type="checkbox"]');
+    const skillCheckbox = page.locator('label:has-text("custom_skill") input[type="checkbox"]');
     await expect(skillCheckbox).toBeVisible();
   });
 });

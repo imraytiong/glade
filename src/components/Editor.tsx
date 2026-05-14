@@ -8,7 +8,7 @@ import 'prismjs/themes/prism-tomorrow.css';
 import './Editor.css';
 
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { copyFile, mkdir } from '@tauri-apps/plugin-fs';
+import { copyFile, mkdir } from '../utils/fs';
 import { basename, dirname } from '@tauri-apps/api/path';
 
 export interface EditorHandle {

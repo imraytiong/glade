@@ -6,6 +6,7 @@ use super::tools::ToolExecutor;
 use crate::mcp::client::McpClient;
 
 pub struct McpToolExecutor {
+    #[allow(dead_code)]
     /// The composite name of the tool (ServerName::ToolName)
     composite_name: String,
     /// The actual name of the tool on the server

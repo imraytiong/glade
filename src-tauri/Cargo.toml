@@ -32,6 +32,12 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 async-trait = "0.1.89"
 tokio = { version = "1.52.3", features = ["full"] }
+axum = "0.7.5"
+tower-http = { version = "0.5.2", features = ["cors"] }
+async-stream = "0.3.6"
+tokio-stream = "0.1.18"
+reqwest-eventsource = "0.6.0"
+futures = "0.3.32"
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
