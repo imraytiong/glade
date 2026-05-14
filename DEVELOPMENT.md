@@ -25,7 +25,13 @@ If you want to build Glade from source:
    npm run build
    ```
 
-5. Run Headless Telemetry & Backend Tests:
+5. Run Playwright E2E Tests:
    ```bash
-   cargo test --manifest-path src-tauri/Cargo.toml
+   npm run test:e2e
+   ```
+
+6. Run Headless Backend Tests:
+   ```bash
+   cd src-tauri
+   cargo test
    ```
