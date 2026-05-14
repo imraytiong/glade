@@ -1496,7 +1496,7 @@ dependencies = [
 
 [[package]]
 name = "glade"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.4"
 dependencies = [
  "async-stream",
  "async-trait",

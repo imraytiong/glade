@@ -1,6 +1,6 @@
 [package]
 name = "glade"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.4"
 description = "A modern Markdown knowledge base and IDE"
 authors = ["you"]
 edition = "2021"
