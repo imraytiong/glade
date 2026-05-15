@@ -185,13 +185,12 @@ pub async fn get_agents(vault_path: String) -> Result<Vec<Agent>, String> {
     let default_skill_dir = glade_dir.join("agents").join("skills").join("Research a Topic");
     
     // Ensure the default skill directory exists
-    if !default_skill_dir.exists() {
-        if let Ok(_) = std::fs::create_dir_all(&default_skill_dir) {
+    if !default_skill_dir.exists()
+        && std::fs::create_dir_all(&default_skill_dir).is_ok() {
             let skill_md_path = default_skill_dir.join("SKILL.md");
             let default_skill_content = "# Research a Topic\n\nThis skill enables the agent to autonomously research a topic using search tools and synthesize the findings.";
             let _ = std::fs::write(&skill_md_path, default_skill_content);
         }
-    }
 
     if !agents_dir.exists() {
         let _ = std::fs::create_dir_all(&agents_dir);
@@ -539,10 +538,10 @@ pub async fn execute_agent(
                 _ => false,
             };
 
-            let require_approval_override = agent.tools_requiring_approval.as_ref().map_or(false, |reqs| reqs.contains(&fc.name));
+            let require_approval_override = agent.tools_requiring_approval.as_ref().is_some_and(|reqs| reqs.contains(&fc.name));
 
             if requires_approval {
-                let explicitly_allowed = agent.tools_allowed.as_ref().map_or(false, |tools| tools.contains(&fc.name));
+                let explicitly_allowed = agent.tools_allowed.as_ref().is_some_and(|tools| tools.contains(&fc.name));
                 
                 if explicitly_allowed && !require_approval_override {
                     requires_approval = false;
@@ -689,7 +688,7 @@ async fn prepare_agent_execution(
         }
         if allowed.contains(&"semantic_search".to_string()) {
             let manager = app_handle.state::<crate::vector_db::VectorDbManager>();
-            if let Ok(db_arc) = manager.get_or_create(&path).await {
+            if let Ok(db_arc) = manager.get_or_create(path).await {
                 executors.insert(
                     "semantic_search".to_string(), 
                     Box::new(tools::SemanticSearchTool { 
@@ -709,7 +708,7 @@ async fn prepare_agent_execution(
         // Actually, we should just let `reload_mcp_servers` handle explicit reloads from the UI,
         // but let's do a quick lazy initialization check.
         if mcp_manager.list_all_tools().await.unwrap_or_default().is_empty() {
-            let _ = mcp_manager.reload(&path).await;
+            let _ = mcp_manager.reload(path).await;
         }
 
         if let Ok(all_tools) = mcp_manager.list_all_tools().await {
@@ -1088,10 +1087,10 @@ pub fn execute_agent_stream(
                     _ => false,
                 };
 
-                let require_approval_override = agent.tools_requiring_approval.as_ref().map_or(false, |reqs| reqs.contains(&fc.name));
+                let require_approval_override = agent.tools_requiring_approval.as_ref().is_some_and(|reqs| reqs.contains(&fc.name));
 
                 if requires_approval {
-                    let explicitly_allowed = agent.tools_allowed.as_ref().map_or(false, |tools| tools.contains(&fc.name));
+                    let explicitly_allowed = agent.tools_allowed.as_ref().is_some_and(|tools| tools.contains(&fc.name));
                     
                     if explicitly_allowed && !require_approval_override {
                         requires_approval = false;

@@ -161,14 +161,12 @@ async fn ping_mcp_server(command: String, args: Vec<String>, env: std::collectio
     let spawn_future = mcp::client::McpClient::spawn(&command, &args, &env, Some(app_handle));
     let client = tokio::time::timeout(std::time::Duration::from_secs(30), spawn_future)
         .await
-        .map_err(|_| "Timeout waiting for MCP server to start. The server might be downloading dependencies or waiting for user input.")?
-        .map_err(|e| e)?;
+        .map_err(|_| "Timeout waiting for MCP server to start. The server might be downloading dependencies or waiting for user input.")??;
         
     let tools_future = client.list_tools();
     let tools = tokio::time::timeout(std::time::Duration::from_secs(10), tools_future)
         .await
-        .map_err(|_| "Timeout waiting for list_tools response")?
-        .map_err(|e| e)?;
+        .map_err(|_| "Timeout waiting for list_tools response")??;
     
     Ok(serde_json::json!({
         "tools": tools.tools
@@ -238,12 +236,9 @@ pub fn run() {
             .build(tauri::generate_context!())
             .expect("error while running tauri application");
 
-        app.run(move |_app_handle, e| match e {
-            tauri::RunEvent::ExitRequested { api, .. } => {
-                if is_headless {
-                    api.prevent_exit();
-                }
+        app.run(move |_app_handle, e| if let tauri::RunEvent::ExitRequested { api, .. } = e {
+            if is_headless {
+                api.prevent_exit();
             }
-            _ => {}
         });
 }

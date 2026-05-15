@@ -216,16 +216,14 @@ async fn fs_read_dir_handler(
 ) -> Result<Json<Vec<FsDirEntry>>, String> {
     let mut entries = Vec::new();
     let dir = std::fs::read_dir(&payload.path).map_err(|e| e.to_string())?;
-    for entry in dir {
-        if let Ok(entry) = entry {
-            let file_type = entry.file_type().map_err(|e| e.to_string())?;
-            entries.push(FsDirEntry {
-                name: entry.file_name().into_string().ok(),
-                is_directory: file_type.is_dir(),
-                is_file: file_type.is_file(),
-                is_symlink: file_type.is_symlink(),
-            });
-        }
+    for entry in dir.flatten() {
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        entries.push(FsDirEntry {
+            name: entry.file_name().into_string().ok(),
+            is_directory: file_type.is_dir(),
+            is_file: file_type.is_file(),
+            is_symlink: file_type.is_symlink(),
+        });
     }
     Ok(Json(entries))
 }

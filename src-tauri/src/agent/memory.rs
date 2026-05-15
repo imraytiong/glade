@@ -75,15 +75,13 @@ impl ThreadManager {
         let reader = BufReader::new(file);
 
         let mut messages = Vec::new();
-        for line_result in reader.lines() {
-            if let Ok(line) = line_result {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                match serde_json::from_str::<MemoryEvent>(&line) {
-                    Ok(event) => messages.push(event.message),
-                    Err(e) => eprintln!("Failed to parse memory event: {}", e),
-                }
+        for line in reader.lines().flatten() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<MemoryEvent>(&line) {
+                Ok(event) => messages.push(event.message),
+                Err(e) => eprintln!("Failed to parse memory event: {}", e),
             }
         }
 

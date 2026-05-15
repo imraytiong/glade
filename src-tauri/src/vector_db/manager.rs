@@ -11,6 +11,12 @@ pub struct VectorDbManager {
     dbs: Arc<RwLock<HashMap<String, Arc<RwLock<VectorDb>>>>>,
 }
 
+impl Default for VectorDbManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VectorDbManager {
     pub fn new() -> Self {
         Self {

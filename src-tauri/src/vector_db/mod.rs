@@ -97,8 +97,8 @@ impl VectorDb {
 
         let mut current_files: HashMap<String, u64> = HashMap::new();
         for entry in walker.filter_map(|e| e.ok()) {
-            if entry.file_type().is_file() {
-                if entry.path().extension().and_then(|s| s.to_str()) == Some("md") {
+            if entry.file_type().is_file()
+                && entry.path().extension().and_then(|s| s.to_str()) == Some("md") {
                     if let Ok(rel_path) = entry.path().strip_prefix(&self.vault_path) {
                         let path_str = rel_path.to_string_lossy().to_string();
                         if let Ok(metadata) = entry.metadata() {
@@ -110,7 +110,6 @@ impl VectorDb {
                         }
                     }
                 }
-            }
         }
 
         let mut next_id = 0;
