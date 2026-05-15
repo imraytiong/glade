@@ -62,7 +62,7 @@ export const AgentPrompt = () => {
 
     useEffect(() => {
         const loadAgents = async () => {
-            const vaultPath = localStorage.getItem('glade_vault_path');
+            const vaultPath = localStorage.getItem('glade_vaultPath');
             if (!vaultPath) return;
             try {
                 const agentsData = await invoke<Agent[]>('get_agents', { vaultPath });
@@ -100,7 +100,7 @@ export const AgentPrompt = () => {
                 agent: selectedAgent,
                 messages: [{ role: 'user', content: prompt.trim() }],
                 context: '',
-                vaultPath: localStorage.getItem('glade_vault_path')
+                vaultPath: localStorage.getItem('glade_vaultPath')
             });
 
             const editor = getEditor();

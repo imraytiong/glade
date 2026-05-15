@@ -61,8 +61,9 @@ Managing complex system prompts inside a JSON file is tedious. We will migrate a
 - The body of the markdown file becomes the `system_prompt`.
 
 #### [MODIFY] `src/components/layout/AgentConfigPane.tsx`
-- Refactor the Left Sidebar Agents view. Clicking an agent simply opens the `.agent.md` file in the main Editor View.
-- **Agent-to-Build-Agents:** Modify the "Create New Agent" flow. Provide an AI prompt box (e.g., "I need a marketing expert who knows SEO"). The Coordinator Agent will autonomously generate the YAML frontmatter and draft a highly-structured Markdown system prompt, saving the new `.agent.md` file instantly.
+- Refactor the Left Sidebar Agents view to be a read-only informational panel.
+- The UI will display a clean list of active agents and their capabilities.
+- Clicking an agent opens the `.agent.md` file in the main Editor View, allowing users to inspect or manually edit the raw configuration.
 
 ---
 
@@ -70,9 +71,9 @@ Managing complex system prompts inside a JSON file is tedious. We will migrate a
 The "Agent Workspace" is not just a chat window—it is a comprehensive control center for managing your AI ecosystem.
 
 #### [NEW] `src/components/agent/AgentWorkspace.tsx`
-- **Fleet Management Center:** A unified dashboard to overview all defined agents in the vault. From here, you can quickly create, update, and manage your entire fleet of specialized agents.
+- **Fleet Management Center:** A unified dashboard to overview all defined agents in the vault. From here, you can quickly manage your entire fleet of specialized agents.
+- **Agent-to-Build-Agents (Agent Builder):** An AI prompt box in the control center to spawn new agents (e.g., "I need a marketing expert who knows SEO"). This flow uses a specialized **Builder Agent** (rather than the Coordinator) to autonomously generate the YAML frontmatter and draft a highly-structured Markdown system prompt, saving the new `.agent.md` file instantly.
 - **Autonomous Orchestration & Approvals:** Shift from simple QA chat to high-level orchestration. Agents can be dispatched to run autonomously in the background on complex tasks. The UI will feature an "Approval Queue" where autonomous agents pause and explicitly ask the user for permission before executing sensitive actions (like running terminal commands or bulk deleting files).
-- **Context & Memory Management:** A dedicated tab to review, edit, and modify "Fleet-Wide Memory". Users can see exactly what global context rules or specific memory banks the agents are currently holding, and manually curate them.
 - **Tracing and Observability:** An expandable, real-time observability panel. This provides a transparent, low-level trace of exactly what every agent is doing in the vault at any given time (e.g., `Agent X is currently parsing /docs/api.md...`, `Agent Y executed tool search_files`).
 
 #### [MODIFY] `src/App.tsx` & `src-tauri/src/main.rs`
@@ -81,22 +82,23 @@ The "Agent Workspace" is not just a chat window—it is a comprehensive control 
 
 ---
 
-### Phase 3: Context Banks & Memory
-Agents need more than just tools; they need predefined knowledge boundaries.
 
-#### [MODIFY] `src-tauri/src/agent/mod.rs`
-- Add a `context_bank: [String]` array to the agent frontmatter.
-- These strings are paths to specific folders or files. When this agent is invoked, the backend automatically injects these exact files into the LLM context window *before* the conversation starts.
 
----
+### Phase 4: Ecosystem Management UI (Ribbon Integration)
+To make Glade truly extensible, we need dedicated interfaces for the user to quickly expand the agent's capabilities without manually writing configuration files. We will integrate these as top-level buttons on the main Ribbon.
 
-### Phase 4: Ecosystem Management UI
-To make Glade truly extensible, we need dedicated interfaces for the user to quickly expand the agent's capabilities without manually writing configuration files.
+#### [MODIFY] `src/App.tsx`
+- **Routing State:** Update the main view state to support new routes: `useState<"editor" | "agent" | "ecosystem-models" | "ecosystem-tools" | "ecosystem-skills">`.
+- **Ribbon Config:** Add `"ecosystem-models"`, `"ecosystem-tools"`, and `"ecosystem-skills"` to the default ribbon configuration.
+- **Icons:** Use `Brain` (Models), `Wrench` (Tools), and `Zap` (Skills) icons from `lucide-react`.
 
 #### [NEW] `src/components/ecosystem/`
-- **AI-Aided Local Tool Creation:** A dedicated UI pane where users can type a prompt (e.g., "Create a tool to parse my CSV exports"), and the Glade Coordinator agent automatically writes, compiles, and registers a new local Rust/Python tool into the vault.
-- **MCP Server Setup:** A visual dashboard to add, test, and authenticate local or remote MCP servers. Instead of editing `mcp_servers.json`, users get a connection health indicator, tool discovery preview, and one-click authorization.
-- **Skills Definition Builder:** A visual or markdown-assisted interface to craft new `SKILL.md` workflows, allowing users to rapidly define multi-step standard operating procedures for their agents.
+- **ModelsPanel:** Move the Gemini API Key input and Model selector from the old settings dialog here.
+- **ToolsPanel:** Move the local MCP Server setup and configuration text area here.
+- **SkillsPanel:** Create a placeholder for the Skills Definition Builder.
+
+#### [MODIFY] `src/components/agent/AgentWorkspace.tsx`
+- Revert the tabbed navigation ("Fleet" vs "Ecosystem") entirely, returning `AgentWorkspace` to solely focus on agent fleet orchestration and editing.
 
 ---
 
@@ -105,6 +107,7 @@ To make Glade truly extensible, we need dedicated interfaces for the user to qui
 ### Alpha 6: Intelligent Storage & Routines
 To maintain velocity, we are designing Alpha 5's data models to support the following advanced orchestration features coming in Alpha 6:
 - **Semantic Vector Search:** Implementing a lightweight, local vector database (like ChromaDB or Qdrant) to allow agents to perform deep semantic searches across the entire vault instantly.
+- **Context Banks & Memory:** Adding `context_bank` arrays to agent frontmatter. These paths are automatically injected into the LLM context window, managed via a dedicated "Fleet-Wide Memory" tab in the Agent Workspace.
 - **File System "Zones" (RBAC):** Defining specific directory "zones" where agents have varying read/write access rights, preventing a rogue agent from overwriting critical areas of the vault.
 - **Side-Car Agent Data (Shadow FS):** The ability to attach agent-generated metadata and markdown files completely separated from the shared user content. This will likely live in a "shadow file system" directory (e.g. `.glade/.shadow/`) so it doesn't clutter the user's primary view, but remains contextually linked.
 - **Automated Routines & Routing:** The ability to visually define complex automated workflows where agents pass outputs to one another (routing) or trigger automatically based on vault events (routines).

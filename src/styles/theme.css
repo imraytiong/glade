@@ -16,6 +16,7 @@
   /* Light Theme Colors */
   --background-primary: #ffffff; /* Main editor background */
   --background-secondary: #f4f4f5; /* Sidebar background */
+  --background-ribbon: #fafafa; /* Slightly lighter than secondary */
   --background-modifier-hover: rgba(0, 0, 0, 0.04);
   --background-modifier-active: rgba(0, 0, 0, 0.08);
   --background-modifier-active-hover: rgba(0, 0, 0, 0.12);
@@ -39,6 +40,7 @@
   /* Dark Theme Colors */
   --background-primary: #0f172a;
   --background-secondary: #1e293b;
+  --background-ribbon: #283548; /* Slightly lighter than secondary */
   --background-modifier-hover: rgba(255, 255, 255, 0.04);
   --background-modifier-active: rgba(255, 255, 255, 0.08);
   --background-modifier-active-hover: rgba(255, 255, 255, 0.12);

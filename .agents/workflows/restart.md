@@ -1,5 +1,4 @@
 ---
 description: restarts the app
 ---
-
-run npm run restart
+run RUST_LOG=debug npm run restart

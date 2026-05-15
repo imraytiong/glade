@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     trace: 'on-first-retry',
     baseURL: 'http://localhost:1420',
+    video: 'on',
   },
   projects: [
     {

@@ -49,3 +49,10 @@ Press `Cmd/Ctrl + P` to open the Command Palette.
 
 ## Distraction-Free (Zen) Mode
 Press `Cmd/Ctrl + Shift + Z` (or trigger it via the Command Palette) to toggle Zen Mode. This hides the sidebars, tabs, and status bar, leaving you with just your content.
+
+## Fleet Builder & Agent Management
+Glade features a dedicated **Fleet Builder** to manage your Multi-Agent System.
+- Click the **Fleet Builder** (Bot Icon) in the left sidebar to enter the Agent Workspace.
+- Here, you can define specific personas (like an "Editor" or "Research Assistant"), assign them tools, and give them capabilities.
+- Agents are stored directly in your vault at `.glade/agents/*.agent.md` so they travel with your data and can be version controlled.
+- From the Fleet Builder, you can also access the **Tools**, **Skills**, and **Models** ecosystem panels to configure external connections (like MCP servers).

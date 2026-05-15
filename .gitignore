@@ -25,3 +25,11 @@ dist-ssr
 
 playwright-report
 test-results
+
+# Testing and debug artifacts
+test-vault/
+.glade/
+debug*.png
+debug*.cjs
+parse_tags.py
+dom.html

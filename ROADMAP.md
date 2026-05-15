@@ -41,7 +41,7 @@ Our focus for Alpha 5 is to elevate agents into first-class citizens with a dedi
 - **Specialized Agent Editors:** GUI-driven form editors overlaid on `.agent.md` files.
 
 ## 🔭 Upcoming Milestone: Alpha 7 (The Inter-Connected Ecosystem)
-- **Inter-Connected Vaults:** The capability to seamlessly connect separate Glade vaults, allowing agents to query and cross-reference information securely over a network protocol.
+- **Inter-Connected Vaults:** The capability to seamlessly connect separate Glade vaults, allowing agents to query and cross-reference information securely across a defined "Collection" boundary. *(See [INTERCONNECTED_VAULTS_RESEARCH.md](./INTERCONNECTED_VAULTS_RESEARCH.md) for approved architectural blueprints and security boundaries)*.
 
 ## 🚀 Mid-Term Goals (Beta to v1.0)
 - **NPM Monorepo Migration:** Restructure the repository into a proper workspace (e.g. `packages/app`, `packages/sdk`) to cleanly share configurations and isolate boundaries.

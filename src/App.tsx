@@ -1,23 +1,47 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { open } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile, rename, remove, mkdir, copyFile } from './utils/fs';
-import { Settings, PanelLeft, Files, List, Bot, MessageSquare } from 'lucide-react';
-import { FileNode, readVaultRecursive, flattenFiles } from './utils/fs';
-import { globalIndexer } from './utils/indexer';
-import { Command } from './utils/commands';
-import { useSettings } from './utils/settings';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  readTextFile,
+  writeTextFile,
+  rename,
+  remove,
+  mkdir,
+  copyFile,
+} from "./utils/fs";
+import {
+  Settings,
+  PanelLeft,
+  Files,
+  List,
+  Bot,
+  MessageSquare,
+  Brain,
+  Wrench,
+  Zap,
+  Activity
+} from "lucide-react";
+import { FileNode, readVaultRecursive, flattenFiles } from "./utils/fs";
+import { globalIndexer } from "./utils/indexer";
+import { Command } from "./utils/commands";
+import { useSettings } from "./utils/settings";
 
-import AgentSidebar, { Message } from './components/layout/AgentSidebar';
-import Editor, { EditorHandle } from './components/Editor';
-import TabBar from './components/TabBar';
-import StatusBar from './components/StatusBar';
-import CommandPalette from './components/CommandPalette';
-import BacklinksPane from './components/BacklinksPane';
+import AgentSidebar, { Message } from "./components/layout/AgentSidebar";
+import AgentWorkspace from "./components/agent/AgentWorkspace";
+import Editor, { EditorHandle } from "./components/Editor";
+import TabBar from "./components/TabBar";
+import StatusBar from "./components/StatusBar";
+import CommandPalette from "./components/CommandPalette";
+import BacklinksPane from "./components/BacklinksPane";
 
-import SettingsDialog from './components/SettingsDialog';
-import ConfirmDeleteModal from './components/ConfirmDeleteModal';
-import Sidebar from './components/layout/Sidebar';
-import './App.css';
+import SettingsDialog from "./components/SettingsDialog";
+import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
+import Sidebar from "./components/layout/Sidebar";
+import ModelsPanel from "./components/ecosystem/ModelsPanel";
+import ToolsPanel from "./components/ecosystem/ToolsPanel";
+import SkillsPanel from "./components/ecosystem/SkillsPanel";
+import TracePanel from "./components/agent/TracePanel";
+import "./App.css";
 
 function extractFrontmatter(content: string) {
   const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -28,7 +52,7 @@ function extractFrontmatter(content: string) {
 }
 
 function combineFrontmatter(frontmatter: string | null, body: string) {
-  if (frontmatter !== null && frontmatter.trim() !== '') {
+  if (frontmatter !== null && frontmatter.trim() !== "") {
     return `---\n${frontmatter}\n---\n${body}`;
   }
   return body;
@@ -38,59 +62,144 @@ function App() {
   const editorRef = useRef<EditorHandle>(null);
 
   const [vaultPath, setVaultPath] = useState<string | null>(() => {
-    return localStorage.getItem('glade_vaultPath');
+    return localStorage.getItem("glade_vaultPath");
   });
-  
+
+  const [currentView, setCurrentView] = useState<"editor" | "agent" | "models" | "tools" | "skills" | "traces">(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    if (view === "agent" || view === "models" || view === "tools" || view === "skills" || view === "traces") return view;
+    return "editor";
+  });
+
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [sidebarWidth, setSidebarWidth] = useState<number>(250);
-  const [sidebarView, setSidebarView] = useState<'explorer' | 'outline' | 'agents'>('explorer');
+  const [sidebarView, setSidebarView] = useState<
+    "explorer" | "outline" | "agents"
+  >("explorer");
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState<boolean>(false);
   const [agentSidebarWidth, setAgentSidebarWidth] = useState<number>(300);
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  
-  const [toast, setToast] = useState<{ message: string, action?: { label: string, onClick: () => void } } | null>(null);
-  const showToast = useCallback((message: string, action?: { label: string, onClick: () => void }) => {
-    setToast({ message, action });
-    setTimeout(() => setToast(null), 5000);
-  }, []);
+
+  const [toast, setToast] = useState<{
+    message: string;
+    action?: { label: string; onClick: () => void };
+  } | null>(null);
+  const showToast = useCallback(
+    (message: string, action?: { label: string; onClick: () => void }) => {
+      setToast({ message, action });
+      setTimeout(() => setToast(null), 5000);
+    },
+    [],
+  );
 
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
-  
+
   const [openFiles, setOpenFiles] = useState<FileNode[]>(() => {
-    const saved = localStorage.getItem('glade_openFiles');
+    const saved = localStorage.getItem("glade_openFiles");
     return saved ? JSON.parse(saved) : [];
   });
-  
+
   const [activeFileIndex, setActiveFileIndex] = useState<number>(() => {
-    const saved = localStorage.getItem('glade_activeFileIndex');
+    const saved = localStorage.getItem("glade_activeFileIndex");
     return saved ? parseInt(saved, 10) : -1;
   });
 
   const { settings, updateSettings } = useSettings();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [paletteMode, setPaletteMode] = useState<'files' | 'commands' | 'link'>('commands');
+  const [paletteMode, setPaletteMode] = useState<"files" | "commands" | "link">(
+    "commands",
+  );
 
-  const [cursorPositions, setCursorPositions] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('glade_cursorPositions');
+  const [cursorPositions, setCursorPositions] = useState<
+    Record<string, number>
+  >(() => {
+    const saved = localStorage.getItem("glade_cursorPositions");
     return saved ? JSON.parse(saved) : {};
   });
 
+  const [ribbonConfig, setRibbonConfig] = useState<{
+    order: string[];
+    hidden: string[];
+    autoHide: boolean;
+  }>(() => {
+    const defaultOrder = [
+        "files",
+        "outline",
+        "agent-chat",
+        "divider",
+        "agent-workspace",
+        "models",
+        "tools",
+        "skills",
+        "traces",
+    ];
+
+    const saved = localStorage.getItem("glade_ribbon_config");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.order) {
+          parsed.order = parsed.order.filter((id: string) => id !== "sidebar");
+          
+          // Ensure new core features are added to existing users' ribbon configs
+          const missingItems = defaultOrder.filter(item => !parsed.order.includes(item) && item !== "divider");
+          if (missingItems.length > 0) {
+              parsed.order = [...parsed.order, ...missingItems];
+          }
+        }
+        return parsed;
+      } catch (e) {
+        console.error("Failed to parse ribbon config", e);
+      }
+    }
+    return {
+      order: defaultOrder,
+      hidden: [],
+      autoHide: false,
+    };
+  });
+
+  const [ribbonContextMenu, setRibbonContextMenu] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+  }>({ x: 0, y: 0, visible: false });
+
+  // Handle outside clicks for context menu
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (ribbonContextMenu.visible) {
+        setRibbonContextMenu({ ...ribbonContextMenu, visible: false });
+      }
+    };
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [ribbonContextMenu]);
+
   // Persistence
   useEffect(() => {
-    if (vaultPath) localStorage.setItem('glade_vaultPath', vaultPath);
-    else localStorage.removeItem('glade_vaultPath');
+    if (vaultPath) localStorage.setItem("glade_vaultPath", vaultPath);
+    else localStorage.removeItem("glade_vaultPath");
   }, [vaultPath]);
 
   useEffect(() => {
-    localStorage.setItem('glade_openFiles', JSON.stringify(openFiles));
-    localStorage.setItem('glade_activeFileIndex', activeFileIndex.toString());
+    localStorage.setItem("glade_openFiles", JSON.stringify(openFiles));
+    localStorage.setItem("glade_activeFileIndex", activeFileIndex.toString());
   }, [openFiles, activeFileIndex]);
 
   useEffect(() => {
-    localStorage.setItem('glade_cursorPositions', JSON.stringify(cursorPositions));
+    localStorage.setItem(
+      "glade_cursorPositions",
+      JSON.stringify(cursorPositions),
+    );
   }, [cursorPositions]);
+
+  useEffect(() => {
+    localStorage.setItem("glade_ribbon_config", JSON.stringify(ribbonConfig));
+  }, [ribbonConfig]);
 
   // Load Tree
   const loadVaultFiles = useCallback(async (path: string) => {
@@ -125,13 +234,22 @@ function App() {
         loadVaultFiles(vaultPath);
       }
     };
-    window.addEventListener('vault-files-changed', handleFilesChanged);
-    return () => window.removeEventListener('vault-files-changed', handleFilesChanged);
+    window.addEventListener("vault-files-changed", handleFilesChanged);
+    return () =>
+      window.removeEventListener("vault-files-changed", handleFilesChanged);
   }, [vaultPath, loadVaultFiles]);
 
-  const [activeFileContent, setActiveFileContent] = useState<{ path: string, content: string, frontmatter: string | null } | null>(null);
-  const [activeHeading, setActiveHeading] = useState<string>('');
-  const [stats, setStats] = useState<{ wordCount: number, charCount: number, readingTime: number } | null>(null);
+  const [activeFileContent, setActiveFileContent] = useState<{
+    path: string;
+    content: string;
+    frontmatter: string | null;
+  } | null>(null);
+  const [activeHeading, setActiveHeading] = useState<string>("");
+  const [stats, setStats] = useState<{
+    wordCount: number;
+    charCount: number;
+    readingTime: number;
+  } | null>(null);
   const [agentMessages, setAgentMessages] = useState<Message[]>([]);
 
   // Load File Content when active tab changes
@@ -146,8 +264,12 @@ function App() {
           const { frontmatter, body } = extractFrontmatter(content);
           setActiveFileContent({ path: file.path, content: body, frontmatter });
         } catch (err) {
-          console.error('Failed to read active file', err);
-          setActiveFileContent({ path: file.path, content: `Error loading file: ${err}`, frontmatter: null });
+          console.error("Failed to read active file", err);
+          setActiveFileContent({
+            path: file.path,
+            content: `Error loading file: ${err}`,
+            frontmatter: null,
+          });
         }
       } else {
         setActiveFileContent(null);
@@ -161,7 +283,7 @@ function App() {
       directory: true,
       multiple: false,
     });
-    if (selected && typeof selected === 'string') {
+    if (selected && typeof selected === "string") {
       if (selected === vaultPath) {
         // Force reload if same path selected
         loadVaultFiles(selected);
@@ -176,7 +298,7 @@ function App() {
 
   const handleOpenFile = (file: FileNode) => {
     // Check if already open
-    const existingIndex = openFiles.findIndex(f => f.path === file.path);
+    const existingIndex = openFiles.findIndex((f) => f.path === file.path);
     if (existingIndex >= 0) {
       setActiveFileIndex(existingIndex);
     } else {
@@ -185,15 +307,19 @@ function App() {
     }
   };
 
-  const [pendingScrollHash, setPendingScrollHash] = useState<string | null>(null);
+  const [pendingScrollHash, setPendingScrollHash] = useState<string | null>(
+    null,
+  );
 
   const handleNavigate = (path: string) => {
-    let [filePath, hash] = path.split('#');
+    let [filePath, hash] = path.split("#");
     if (!filePath && activeFile) filePath = activeFile.path;
 
     const flatFiles = flattenFiles(fileTree);
-    const target = flatFiles.find(f => f.path === filePath || f.path.endsWith(filePath));
-    
+    const target = flatFiles.find(
+      (f) => f.path === filePath || f.path.endsWith(filePath),
+    );
+
     if (target) {
       if (activeFile?.path === target.path && hash && editorRef.current) {
         editorRef.current.scrollToHeader(hash);
@@ -212,7 +338,7 @@ function App() {
       // Small timeout to let Editor mount and parse content
       setTimeout(() => {
         if (editorRef.current) {
-           editorRef.current.scrollToHeader(pendingScrollHash);
+          editorRef.current.scrollToHeader(pendingScrollHash);
         }
       }, 50);
       setPendingScrollHash(null);
@@ -221,15 +347,20 @@ function App() {
 
   const handleCreateFile = async (name: string) => {
     if (!vaultPath) return;
-    const safeName = name.replace(/\.md$/, '') + '.md';
+    const safeName = name.replace(/\.md$/, "") + ".md";
     const newPath = `${vaultPath}/${safeName}`;
     try {
-      await writeTextFile(newPath, `# ${name.replace(/\.md$/, '')}\n\n`);
+      await writeTextFile(newPath, `# ${name.replace(/\.md$/, "")}\n\n`);
       await loadVaultFiles(vaultPath);
       // Wait for state to update, or just open directly:
-      handleOpenFile({ name: safeName, path: newPath, isDirectory: false, children: [] });
+      handleOpenFile({
+        name: safeName,
+        path: newPath,
+        isDirectory: false,
+        children: [],
+      });
     } catch (err) {
-      console.error('Failed to create file', err);
+      console.error("Failed to create file", err);
     }
   };
 
@@ -237,7 +368,7 @@ function App() {
     e.stopPropagation();
     const newOpenFiles = openFiles.filter((_, i) => i !== indexToClose);
     setOpenFiles(newOpenFiles);
-    
+
     if (newOpenFiles.length === 0) {
       setActiveFileIndex(-1);
       setStats(null);
@@ -248,59 +379,76 @@ function App() {
   };
 
   const handleSaveFile = async (newBody: string) => {
-    if (activeFileIndex >= 0 && activeFileIndex < openFiles.length && activeFileContent) {
+    if (
+      activeFileIndex >= 0 &&
+      activeFileIndex < openFiles.length &&
+      activeFileContent
+    ) {
       const activeFile = openFiles[activeFileIndex];
       const newRaw = combineFrontmatter(activeFileContent.frontmatter, newBody);
       try {
         await writeTextFile(activeFile.path, newRaw);
         // We don't update state here because Milkdown's internal state handles body changes.
         // However, we should keep activeFileContent.content in sync for BacklinksPane.
-        setActiveFileContent(prev => prev ? { ...prev, content: newBody } : null);
+        setActiveFileContent((prev) =>
+          prev ? { ...prev, content: newBody } : null,
+        );
       } catch (err) {
-        console.error('Failed to save file', err);
+        console.error("Failed to save file", err);
       }
     }
   };
 
   const handleFrontmatterChange = async (newFrontmatter: string) => {
-    if (activeFileIndex >= 0 && activeFileIndex < openFiles.length && activeFileContent) {
+    if (
+      activeFileIndex >= 0 &&
+      activeFileIndex < openFiles.length &&
+      activeFileContent
+    ) {
       const activeFile = openFiles[activeFileIndex];
-      const newRaw = combineFrontmatter(newFrontmatter, activeFileContent.content);
+      const newRaw = combineFrontmatter(
+        newFrontmatter,
+        activeFileContent.content,
+      );
       try {
         await writeTextFile(activeFile.path, newRaw);
-        setActiveFileContent(prev => prev ? { ...prev, frontmatter: newFrontmatter } : null);
+        setActiveFileContent((prev) =>
+          prev ? { ...prev, frontmatter: newFrontmatter } : null,
+        );
       } catch (err) {
-        console.error('Failed to save frontmatter', err);
+        console.error("Failed to save frontmatter", err);
       }
     }
   };
 
   const handleCursorChange = (path: string, pos: number) => {
-    setCursorPositions(prev => ({
+    setCursorPositions((prev) => ({
       ...prev,
-      [path]: pos
+      [path]: pos,
     }));
   };
 
-  const activeFile = activeFileIndex >= 0 && activeFileIndex < openFiles.length 
-    ? openFiles[activeFileIndex] 
-    : null;
+  const activeFile =
+    activeFileIndex >= 0 && activeFileIndex < openFiles.length
+      ? openFiles[activeFileIndex]
+      : null;
 
   // Define Global Commands
   const commands: Command[] = [
     {
-      id: 'app.toggleSidebar',
-      name: 'Toggle Sidebar',
-      action: () => setIsSidebarOpen(prev => !prev),
+      id: "app.toggleSidebar",
+      name: "Toggle Sidebar",
+      action: () => setIsSidebarOpen((prev) => !prev),
     },
     {
-      id: 'app.toggleTypewriterMode',
-      name: 'Toggle Typewriter Mode',
-      action: () => updateSettings({ typewriterMode: !settings.typewriterMode }),
+      id: "app.toggleTypewriterMode",
+      name: "Toggle Typewriter Mode",
+      action: () =>
+        updateSettings({ typewriterMode: !settings.typewriterMode }),
     },
     {
-      id: 'app.closeTab',
-      name: 'Close Active Tab',
+      id: "app.closeTab",
+      name: "Close Active Tab",
       action: () => {
         if (activeFileIndex >= 0) {
           const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
@@ -309,74 +457,78 @@ function App() {
       },
     },
     {
-      id: 'editor.toggleLineNumbers',
-      name: 'Toggle Line Numbers',
+      id: "editor.toggleLineNumbers",
+      name: "Toggle Line Numbers",
       action: () => updateSettings({ lineNumbers: !settings.lineNumbers }),
     },
     {
-      id: 'add-properties',
-      name: 'Add Properties (Frontmatter)',
+      id: "add-properties",
+      name: "Add Properties (Frontmatter)",
       action: () => {
         if (activeFileContent && activeFileContent.frontmatter === null) {
-          handleFrontmatterChange('title: ' + (activeFile?.name.replace('.md', '') || 'New Page'));
+          handleFrontmatterChange(
+            "title: " + (activeFile?.name.replace(".md", "") || "New Page"),
+          );
         }
       },
     },
     {
-      id: 'editor.toggleWordWrap',
-      name: 'Toggle Word Wrap',
+      id: "editor.toggleWordWrap",
+      name: "Toggle Word Wrap",
       action: () => updateSettings({ wordWrap: !settings.wordWrap }),
     },
     {
-      id: 'app.toggleZenMode',
-      name: 'Toggle Zen Mode',
-      action: () => setIsZenMode(prev => !prev),
-    }
+      id: "app.toggleZenMode",
+      name: "Toggle Zen Mode",
+      action: () => setIsZenMode((prev) => !prev),
+    },
   ];
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // We parse the hotkeys from settings.hotkeys
       const checkHotkey = (hotkey: string) => {
-        const parts = hotkey.toLowerCase().split('+');
+        const parts = hotkey.toLowerCase().split("+");
         const key = parts.pop();
-        const hasCmd = parts.includes('cmd') || parts.includes('ctrl');
-        const hasShift = parts.includes('shift');
-        return (hasCmd ? (e.metaKey || e.ctrlKey) : !(e.metaKey || e.ctrlKey)) &&
-               (hasShift ? e.shiftKey : !e.shiftKey) &&
-               e.key.toLowerCase() === key;
+        const hasCmd = parts.includes("cmd") || parts.includes("ctrl");
+        const hasShift = parts.includes("shift");
+        return (
+          (hasCmd ? e.metaKey || e.ctrlKey : !(e.metaKey || e.ctrlKey)) &&
+          (hasShift ? e.shiftKey : !e.shiftKey) &&
+          e.key.toLowerCase() === key
+        );
       };
 
-      if (checkHotkey(settings.hotkeys['command.palette'])) {
+      if (checkHotkey(settings.hotkeys["command.palette"])) {
         e.preventDefault();
-        setPaletteMode('commands');
+        setPaletteMode("commands");
         setIsCommandPaletteOpen(true);
-      } else if (checkHotkey(settings.hotkeys['file.search'])) {
+      } else if (checkHotkey(settings.hotkeys["file.search"])) {
         e.preventDefault();
-        setPaletteMode('files');
+        setPaletteMode("files");
         setIsCommandPaletteOpen(true);
-      } else if (checkHotkey(settings.hotkeys['app.toggleSidebar'])) {
+      } else if (checkHotkey(settings.hotkeys["app.toggleSidebar"])) {
         e.preventDefault();
-        setIsSidebarOpen(prev => !prev);
-      } else if (checkHotkey(settings.hotkeys['app.closeTab'])) {
+        setIsSidebarOpen((prev) => !prev);
+      } else if (checkHotkey(settings.hotkeys["app.closeTab"])) {
         e.preventDefault();
         if (activeFileIndex >= 0) {
           const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
           handleTabClose(fakeEvent, activeFileIndex);
         }
-      } else if (checkHotkey('cmd+k') || checkHotkey('ctrl+k')) {
+      } else if (checkHotkey("cmd+k") || checkHotkey("ctrl+k")) {
         e.preventDefault();
-        setPaletteMode('link');
+        setPaletteMode("link");
         setIsCommandPaletteOpen(true);
       }
     };
-    
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [settings.hotkeys, activeFileIndex, openFiles]);
 
   const handlePaletteSelect = (file: FileNode) => {
-    if (paletteMode === 'link' && editorRef.current) {
+    if (paletteMode === "link" && editorRef.current) {
       editorRef.current.insertLink({ name: file.name, path: file.path });
     } else {
       handleOpenFile(file);
@@ -389,7 +541,9 @@ function App() {
   const executeDelete = async (path: string) => {
     try {
       await remove(path, { recursive: true });
-      const updatedOpenFiles = openFiles.filter(f => !f.path.startsWith(path));
+      const updatedOpenFiles = openFiles.filter(
+        (f) => !f.path.startsWith(path),
+      );
       setOpenFiles(updatedOpenFiles);
       if (activeFileContent?.path.startsWith(path)) {
         if (updatedOpenFiles.length > 0) {
@@ -406,7 +560,8 @@ function App() {
   };
 
   const requestDelete = (path: string) => {
-    const skipConfirm = localStorage.getItem('glade_skipDeleteConfirm') === 'true';
+    const skipConfirm =
+      localStorage.getItem("glade_skipDeleteConfirm") === "true";
     if (skipConfirm) {
       executeDelete(path);
     } else {
@@ -416,7 +571,7 @@ function App() {
 
   const handleConfirmDelete = (dontShowAgain: boolean) => {
     if (dontShowAgain) {
-      localStorage.setItem('glade_skipDeleteConfirm', 'true');
+      localStorage.setItem("glade_skipDeleteConfirm", "true");
     }
     if (fileToDelete) {
       executeDelete(fileToDelete);
@@ -445,7 +600,11 @@ function App() {
       }
       await writeTextFile(newFilePath, "");
       loadVaultFiles(vaultPath);
-      handleOpenFile({ name: newFilePath.split(/[/\\]/).pop()!, path: newFilePath, isDirectory: false });
+      handleOpenFile({
+        name: newFilePath.split(/[/\\]/).pop()!,
+        path: newFilePath,
+        isDirectory: false,
+      });
     } catch (err) {
       console.error("Failed to create file", err);
       showToast("Failed to create file");
@@ -465,20 +624,23 @@ function App() {
   };
 
   const handleMoveFile = async (oldPath: string, newFolderPath: string) => {
-    const fileName = oldPath.split('/').pop() || oldPath.split('\\').pop() || '';
+    const fileName =
+      oldPath.split("/").pop() || oldPath.split("\\").pop() || "";
     const newPath = `${newFolderPath}/${fileName}`;
     if (oldPath === newPath) return;
-    
+
     try {
       await rename(oldPath, newPath);
       await globalIndexer.globalRename(oldPath, newPath);
-      
-      const updatedOpenFiles = openFiles.map(f => f.path === oldPath ? { ...f, path: newPath } : f);
+
+      const updatedOpenFiles = openFiles.map((f) =>
+        f.path === oldPath ? { ...f, path: newPath } : f,
+      );
       setOpenFiles(updatedOpenFiles);
       if (activeFileContent?.path === oldPath) {
         setActiveFileContent({ ...activeFileContent, path: newPath });
       }
-      
+
       loadVaultFiles(vaultPath!);
     } catch (err) {
       console.error("Failed to move file", err);
@@ -486,36 +648,50 @@ function App() {
     }
   };
 
-  const handleRenameFile = async (oldPath: string, newName: string, isDirectory?: boolean) => {
+  const handleRenameFile = async (
+    oldPath: string,
+    newName: string,
+    isDirectory?: boolean,
+  ) => {
     if (!vaultPath) return;
-    
+
     let finalName = newName;
     if (!isDirectory) {
-      const isExtension = newName.endsWith('.md');
-      finalName = isExtension ? newName : newName + '.md';
+      const isExtension = newName.endsWith(".md");
+      finalName = isExtension ? newName : newName + ".md";
     }
-    
-    const oldDir = oldPath.substring(0, Math.max(oldPath.lastIndexOf('/'), oldPath.lastIndexOf('\\')));
+
+    const oldDir = oldPath.substring(
+      0,
+      Math.max(oldPath.lastIndexOf("/"), oldPath.lastIndexOf("\\")),
+    );
     const newPath = `${oldDir}/${finalName}`;
 
     if (oldPath === newPath) return;
 
     try {
       await rename(oldPath, newPath);
-      
+
       const updatedFiles = await globalIndexer.globalRename(oldPath, newPath);
-      
+
       if (updatedFiles.length > 0) {
-        showToast(`Updated ${updatedFiles.length} links referencing this file.`, {
-          label: 'See Details',
-          onClick: () => {
-            alert(`Files updated:\n${updatedFiles.map(f => f.split(/[/\\]/).pop()).join('\n')}`);
-          }
-        });
+        showToast(
+          `Updated ${updatedFiles.length} links referencing this file.`,
+          {
+            label: "See Details",
+            onClick: () => {
+              alert(
+                `Files updated:\n${updatedFiles.map((f) => f.split(/[/\\]/).pop()).join("\n")}`,
+              );
+            },
+          },
+        );
       }
 
       // Update open files logic (if the renamed file was open)
-      const updatedOpenFiles = openFiles.map(f => f.path === oldPath ? { ...f, path: newPath, name: finalName } : f);
+      const updatedOpenFiles = openFiles.map((f) =>
+        f.path === oldPath ? { ...f, path: newPath, name: finalName } : f,
+      );
       setOpenFiles(updatedOpenFiles);
       if (activeFileContent?.path === oldPath) {
         setActiveFileContent({ ...activeFileContent, path: newPath });
@@ -534,17 +710,20 @@ function App() {
       showToast("Duplicating folders is not currently supported");
       return;
     }
-    
+
     try {
       // Find a unique name
-      const dir = path.substring(0, Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')));
-      let fileName = path.split(/[/\\]/).pop() || 'Untitled';
-      const ext = fileName.endsWith('.md') ? '.md' : '';
-      const baseName = fileName.replace(/\.md$/, '');
-      
+      const dir = path.substring(
+        0,
+        Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")),
+      );
+      let fileName = path.split(/[/\\]/).pop() || "Untitled";
+      const ext = fileName.endsWith(".md") ? ".md" : "";
+      const baseName = fileName.replace(/\.md$/, "");
+
       let newFilePath = `${dir}/${baseName} copy${ext}`;
       let counter = 1;
-      
+
       while (true) {
         try {
           await readTextFile(newFilePath);
@@ -555,7 +734,7 @@ function App() {
           break;
         }
       }
-      
+
       await copyFile(path, newFilePath);
       loadVaultFiles(vaultPath);
     } catch (err) {
@@ -565,49 +744,401 @@ function App() {
   };
 
   return (
-    <div className={`app-container ${isZenMode ? 'zen-mode' : ''}`}>
+    <div className={`app-container ${isZenMode ? "zen-mode" : ""}`}>
       {toast && (
-        <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000, background: 'var(--bg-modifier-active)', color: 'var(--text-primary)', padding: '10px 16px', borderRadius: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            zIndex: 1000,
+            background: "var(--bg-modifier-active)",
+            color: "var(--text-primary)",
+            padding: "10px 16px",
+            borderRadius: "4px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
           <span>{toast.message}</span>
           {toast.action && (
-            <button onClick={toast.action.onClick} style={{ background: 'var(--text-accent)', color: '#000', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}>
+            <button
+              onClick={toast.action.onClick}
+              style={{
+                background: "var(--text-accent)",
+                color: "#000",
+                border: "none",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.875rem",
+              }}
+            >
               {toast.action.label}
             </button>
           )}
         </div>
       )}
-      {!isZenMode && (
-        <div className="ribbon">
-          <div className="ribbon-top">
-            <button className="icon-btn" onClick={() => setIsSidebarOpen(prev => !prev)} title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}>
-              <PanelLeft size={20} />
-            </button>
-            <button className={`icon-btn ${sidebarView === 'explorer' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
-              if (sidebarView === 'explorer' && isSidebarOpen) setIsSidebarOpen(false);
-              else { setSidebarView('explorer'); setIsSidebarOpen(true); }
-            }} title="Files">
-              <Files size={20} />
-            </button>
-            <button className={`icon-btn ${sidebarView === 'outline' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
-              if (sidebarView === 'outline' && isSidebarOpen) setIsSidebarOpen(false);
-              else { setSidebarView('outline'); setIsSidebarOpen(true); }
-            }} title="Outline">
-              <List size={20} />
-            </button>
-            <button className={`icon-btn ${sidebarView === 'agents' && isSidebarOpen ? 'active' : ''}`} onClick={() => {
-              if (sidebarView === 'agents' && isSidebarOpen) setIsSidebarOpen(false);
-              else { setSidebarView('agents'); setIsSidebarOpen(true); }
-            }} title="Agents">
-              <Bot size={20} />
-            </button>
-            <button className={`icon-btn ${isAgentSidebarOpen ? 'active' : ''}`} onClick={() => {
-              setIsAgentSidebarOpen(prev => !prev);
-            }} title="Agent Chat">
-              <MessageSquare size={20} />
-            </button>
+      {/* Ribbon Context Menu */}
+      {ribbonContextMenu.visible && (
+        <div
+          style={{
+            position: "fixed",
+            top: ribbonContextMenu.y,
+            left: ribbonContextMenu.x,
+            backgroundColor: "var(--background-secondary)",
+            border: "1px solid var(--background-modifier-border)",
+            borderRadius: "4px",
+            boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+            padding: "8px 0",
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+            minWidth: "180px",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{
+              padding: "4px 12px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Ribbon Layout
           </div>
-          <div className="ribbon-bottom">
-            <button className="icon-btn" onClick={() => setIsSettingsOpen(true)} title="Settings">
+          <div
+            style={{
+              padding: "8px 12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+            onClick={() =>
+              setRibbonConfig((prev) => ({ ...prev, autoHide: !prev.autoHide }))
+            }
+          >
+            <input
+              type="checkbox"
+              checked={ribbonConfig.autoHide}
+              readOnly
+              style={{ margin: 0 }}
+            />
+            <span>Auto Hide Ribbon</span>
+          </div>
+          <div
+            style={{
+              height: "1px",
+              backgroundColor: "var(--background-modifier-border)",
+              margin: "4px 0",
+            }}
+          />
+          {[
+            { id: "files", label: "Files" },
+            { id: "outline", label: "Outline" },
+            { id: "agent-chat", label: "Agent Chat" },
+            { id: "agent-workspace", label: "Agent Workspace" },
+          ].map((item) => (
+            <div
+              key={item.id}
+              style={{
+                padding: "4px 12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+              onClick={() => {
+                setRibbonConfig((prev) => {
+                  const hidden = prev.hidden.includes(item.id)
+                    ? prev.hidden.filter((h) => h !== item.id)
+                    : [...prev.hidden, item.id];
+                  return { ...prev, hidden };
+                });
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={!ribbonConfig.hidden.includes(item.id)}
+                readOnly
+                style={{ margin: 0 }}
+              />
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isZenMode && (
+        <div
+          className="ribbon"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setRibbonContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+          }}
+          style={{
+            marginLeft: ribbonConfig.autoHide ? "-48px" : "0",
+            transition: "margin-left 0.2s ease",
+            position: "relative",
+            zIndex: 50,
+            height: "100%",
+          }}
+          onMouseEnter={(e) => {
+            if (ribbonConfig.autoHide) {
+              e.currentTarget.style.marginLeft = "0";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (ribbonConfig.autoHide) {
+              e.currentTarget.style.marginLeft = "-48px";
+            }
+          }}
+        >
+          {ribbonConfig.autoHide && (
+            <div
+              style={{
+                position: "absolute",
+                left: "100%",
+                top: 0,
+                width: "12px",
+                height: "100%",
+                cursor: "ew-resize",
+              }}
+            />
+          )}
+          
+          {/* Ribbon Top Group */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", gap: "8px" }}>
+            {/* Static Sidebar Toggle */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", paddingTop: "4px" }}>
+              <button
+                className={`icon-btn ${isSidebarOpen && currentView === "editor" ? "active" : ""}`}
+                onClick={() => {
+                  if (currentView !== "editor") setCurrentView("editor");
+                  setIsSidebarOpen((prev) => !prev);
+                }}
+                title={
+                  isSidebarOpen && currentView === "editor"
+                    ? "Collapse Sidebar"
+                    : "Expand Sidebar"
+                }
+              >
+                <PanelLeft size={20} />
+              </button>
+              <div
+                style={{
+                  width: "60%",
+                  height: "1px",
+                  backgroundColor: "var(--background-modifier-border)",
+                  margin: "8px 0 0 0",
+                }}
+              />
+            </div>
+
+          <DragDropContext
+            onDragEnd={(result) => {
+              if (!result.destination) return;
+              const newOrder = Array.from(ribbonConfig.order);
+              const [reorderedItem] = newOrder.splice(result.source.index, 1);
+              newOrder.splice(result.destination.index, 0, reorderedItem);
+              setRibbonConfig((prev) => ({ ...prev, order: newOrder }));
+            }}
+          >
+            <Droppable droppableId="ribbon-droppable">
+              {(provided) => (
+                <div
+                  className="ribbon-top"
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                >
+                  {ribbonConfig.order.map((id, index) => {
+                    if (ribbonConfig.hidden.includes(id)) return null;
+
+                    return (
+                      <Draggable key={id} draggableId={id} index={index}>
+                        {(provided, snapshot) => {
+                          if (id === "divider") {
+                            return (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  width: "60%",
+                                  height: "1px",
+                                  backgroundColor:
+                                    "var(--background-modifier-border)",
+                                  margin: "8px 0",
+                                  cursor: "grab",
+                                  ...provided.draggableProps.style,
+                                }}
+                              />
+                            );
+                          }
+
+                          let icon, onClick, title, isActive;
+                          switch (id) {
+                            case "files":
+                              icon = <Files size={20} />;
+                              onClick = () => {
+                                setCurrentView("editor");
+                                if (sidebarView === "explorer" && isSidebarOpen)
+                                  setIsSidebarOpen(false);
+                                else {
+                                  setSidebarView("explorer");
+                                  setIsSidebarOpen(true);
+                                }
+                              };
+                              title = "Files";
+                              isActive =
+                                currentView === "editor" &&
+                                sidebarView === "explorer" &&
+                                isSidebarOpen;
+                              break;
+                            case "outline":
+                              icon = <List size={20} />;
+                              onClick = () => {
+                                setCurrentView("editor");
+                                if (sidebarView === "outline" && isSidebarOpen)
+                                  setIsSidebarOpen(false);
+                                else {
+                                  setSidebarView("outline");
+                                  setIsSidebarOpen(true);
+                                }
+                              };
+                              title = "Outline";
+                              isActive =
+                                currentView === "editor" &&
+                                sidebarView === "outline" &&
+                                isSidebarOpen;
+                              break;
+                            case "agent-chat":
+                              icon = <MessageSquare size={20} />;
+                              onClick = () => {
+                                if (currentView !== "editor") {
+                                  setCurrentView("editor");
+                                  if (!isAgentSidebarOpen)
+                                    setIsAgentSidebarOpen(true);
+                                } else {
+                                  setIsAgentSidebarOpen((prev) => !prev);
+                                }
+                              };
+                              title = "Agent Chat";
+                              isActive = isAgentSidebarOpen;
+                              break;
+                            case "agent-workspace":
+                              icon = <Bot size={20} />;
+                              onClick = () => {
+                                setCurrentView("agent");
+                                setIsSidebarOpen(false);
+                                setIsAgentSidebarOpen(false);
+                              };
+                              title = "Fleet Builder";
+                              isActive = currentView === "agent";
+                              break;
+                            case "models":
+                              icon = <Brain size={20} />;
+                              onClick = () => {
+                                setCurrentView("models");
+                                setIsSidebarOpen(false);
+                                setIsAgentSidebarOpen(false);
+                              };
+                              title = "AI Models";
+                              isActive = currentView === "models";
+                              break;
+                            case "tools":
+                              icon = <Wrench size={20} />;
+                              onClick = () => {
+                                setCurrentView("tools");
+                                setIsSidebarOpen(false);
+                                setIsAgentSidebarOpen(false);
+                              };
+                              title = "MCP Tools";
+                              isActive = currentView === "tools";
+                              break;
+                            case "skills":
+                              icon = <Zap size={20} />;
+                              onClick = () => {
+                                setCurrentView("skills");
+                                setIsSidebarOpen(false);
+                                setIsAgentSidebarOpen(false);
+                              };
+                              title = "Agent Skills";
+                              isActive = currentView === "skills";
+                              break;
+                            case "traces":
+                              icon = <Activity size={20} />;
+                              onClick = () => {
+                                setCurrentView("traces");
+                                setIsSidebarOpen(false);
+                                setIsAgentSidebarOpen(false);
+                              };
+                              title = "Activity Traces";
+                              isActive = currentView === "traces";
+                              break;
+                            default:
+                              return null;
+                          }
+
+                          return (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                cursor: snapshot.isDragging
+                                  ? "grabbing"
+                                  : "grab",
+                                display: "flex",
+                                justifyContent: "center",
+                                width: "100%",
+                              }}
+                            >
+                              <button
+                                className={`icon-btn ${isActive ? "active" : ""}`}
+                                onClick={onClick}
+                                title={title}
+                                style={{
+                                  pointerEvents: snapshot.isDragging
+                                    ? "none"
+                                    : "auto",
+                                }}
+                              >
+                                {icon}
+                              </button>
+                            </div>
+                          );
+                        }}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+          </div>
+          <div className="ribbon-bottom" style={{ gap: "4px" }}>
+            <div
+              style={{
+                width: "60%",
+                height: "1px",
+                backgroundColor: "var(--background-modifier-border)",
+                margin: "0",
+              }}
+            />
+            <button
+              className="icon-btn"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Settings"
+            >
               <Settings size={20} />
             </button>
           </div>
@@ -615,8 +1146,17 @@ function App() {
       )}
 
       {isSidebarOpen && !isZenMode && (
-        <div style={{ display: 'flex', flexShrink: 0, height: '100%', width: `${sidebarWidth}px` }}>
-          <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
+        <div
+          style={{
+            display: "flex",
+            flexShrink: 0,
+            height: "100%",
+            width: `${sidebarWidth}px`,
+          }}
+        >
+          <div
+            style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden" }}
+          >
             <Sidebar
               sidebarView={sidebarView}
               vaultPath={vaultPath}
@@ -638,11 +1178,11 @@ function App() {
           </div>
           <div
             style={{
-              width: '4px',
-              cursor: 'col-resize',
-              backgroundColor: 'transparent',
+              width: "4px",
+              cursor: "col-resize",
+              backgroundColor: "transparent",
               flexShrink: 0,
-              zIndex: 10
+              zIndex: 10,
             }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -651,130 +1191,275 @@ function App() {
 
               const onMouseMove = (moveEvent: MouseEvent) => {
                 const delta = moveEvent.clientX - startX; // Right handle
-                const newWidth = Math.max(150, Math.min(600, startWidth + delta));
+                const newWidth = Math.max(
+                  150,
+                  Math.min(600, startWidth + delta),
+                );
                 setSidebarWidth(newWidth);
               };
 
               const onMouseUp = () => {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
               };
 
-              document.addEventListener('mousemove', onMouseMove);
-              document.addEventListener('mouseup', onMouseUp);
+              document.addEventListener("mousemove", onMouseMove);
+              document.addEventListener("mouseup", onMouseUp);
             }}
           />
         </div>
       )}
 
       <div className="main-content">
-        {!vaultPath ? (
-          <div className="empty-state">
-            <h2>Welcome to Glade</h2>
-            <div style={{ background: 'var(--bg-modifier-error, rgba(255, 0, 0, 0.1))', color: 'var(--text-error, #ff4444)', padding: '12px', borderRadius: '8px', marginBottom: '24px', maxWidth: '400px', fontSize: '13px', border: '1px solid var(--text-error, #ff4444)' }}>
-              <strong>Extreme Alpha Warning</strong><br/>
-              This is an early alpha release (0.0.1-alpha.1) and is not ready for production use. Please make a copy of your valued markdown vaults before opening them with Glade.
-            </div>
-            <p style={{ marginBottom: '24px' }}>Open a folder to start your knowledge base.</p>
-            <button className="btn" onClick={handleOpenVault}>Open Vault</button>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            minWidth: 0,
+            width: "100%",
+          }}
+        >
+          {/* Agent Workspace View */}
+          <div
+            style={{
+              display: currentView === "agent" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <AgentWorkspace isActive={currentView === "agent"} />
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, width: '100%' }}>
-            {!isZenMode && (
-              <TabBar 
-                openFiles={openFiles} 
-                activeFileIndex={activeFileIndex} 
-                onTabClick={setActiveFileIndex}
-                onTabClose={handleTabClose}
-                onRename={handleRenameFile}
-              />
-            )}
-            
-            {!activeFile ? (
+
+          {/* Models View */}
+          <div
+            style={{
+              display: currentView === "models" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <ModelsPanel />
+          </div>
+
+          {/* Tools View */}
+          <div
+            style={{
+              display: currentView === "tools" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <ToolsPanel />
+          </div>
+
+          {/* Skills View */}
+          <div
+            style={{
+              display: currentView === "skills" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <SkillsPanel />
+          </div>
+
+          {/* Traces View */}
+          <div
+            style={{
+              display: currentView === "traces" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <TracePanel />
+          </div>
+
+          {/* Editor View */}
+          <div
+            style={{
+              display: currentView === "editor" ? "flex" : "none",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            {!vaultPath ? (
               <div className="empty-state">
-                <p>Select a file to start editing.</p>
+                <h2>Welcome to Glade</h2>
+                <div
+                  style={{
+                    background:
+                      "var(--bg-modifier-error, rgba(255, 0, 0, 0.1))",
+                    color: "var(--text-error, #ff4444)",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    marginBottom: "24px",
+                    maxWidth: "400px",
+                    fontSize: "13px",
+                    border: "1px solid var(--text-error, #ff4444)",
+                  }}
+                >
+                  <strong>Extreme Alpha Warning</strong>
+                  <br />
+                  This is an early alpha release (0.0.1-alpha.1) and is not
+                  ready for production use. Please make a copy of your valued
+                  markdown vaults before opening them with Glade.
+                </div>
+                <p style={{ marginBottom: "24px" }}>
+                  Open a folder to start your knowledge base.
+                </p>
+                <button className="btn" onClick={handleOpenVault}>
+                  Open Vault
+                </button>
               </div>
             ) : (
-              <div className="editor-container">
-                {activeFileContent && activeFileContent.path === activeFile.path ? (
-                  <div style={{ display: 'flex', flexDirection: 'row', flex: 1, minHeight: 0 }}>
-                    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "100%",
+                  minWidth: 0,
+                  width: "100%",
+                }}
+              >
+                {!isZenMode && (
+                  <TabBar
+                    openFiles={openFiles}
+                    activeFileIndex={activeFileIndex}
+                    onTabClick={setActiveFileIndex}
+                    onTabClose={handleTabClose}
+                    onRename={handleRenameFile}
+                  />
+                )}
 
-                      <Editor 
-                        key={activeFileContent.path}
-                        ref={editorRef}
-                        initialContent={activeFileContent.content} 
-                        onSave={handleSaveFile} 
-                        fileName={activeFile.name}
-                        filePath={activeFile.path}
-                        workspaceRoot={vaultPath || undefined}
-                        initialCursorPos={cursorPositions[activeFile.path]}
-                        onCursorChange={(pos) => handleCursorChange(activeFile.path, pos)}
-                        onActiveHeadingChange={setActiveHeading}
-                        allFiles={flattenFiles(fileTree)}
-                        onNavigate={handleNavigate}
-                        onCreateFile={handleCreateFile}
-                        onRename={handleRenameFile}
-                        onStatsChange={setStats}
-                      >
-                        <BacklinksPane 
-                          activeFilePath={activeFile.path} 
-                          activeFileContent={activeFileContent.content} 
-                          onNavigate={handleNavigate} 
-                        />
-                      </Editor>
-                    </div>
+                {!activeFile ? (
+                  <div className="empty-state">
+                    <p>Select a file to start editing.</p>
                   </div>
                 ) : (
-                  <div className="loading-editor" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-faint)' }}>Loading...</div>
+                  <div className="editor-container">
+                    {activeFileContent &&
+                    activeFileContent.path === activeFile.path ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "row",
+                          flex: 1,
+                          minHeight: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                          }}
+                        >
+                          <Editor
+                            key={activeFileContent.path}
+                            ref={editorRef}
+                            initialContent={activeFileContent.content}
+                            onSave={handleSaveFile}
+                            fileName={activeFile.name}
+                            filePath={activeFile.path}
+                            workspaceRoot={vaultPath || undefined}
+                            initialCursorPos={cursorPositions[activeFile.path]}
+                            onCursorChange={(pos) =>
+                              handleCursorChange(activeFile.path, pos)
+                            }
+                            onActiveHeadingChange={setActiveHeading}
+                            allFiles={flattenFiles(fileTree)}
+                            onNavigate={handleNavigate}
+                            onCreateFile={handleCreateFile}
+                            onRename={handleRenameFile}
+                            onStatsChange={setStats}
+                          >
+                            <BacklinksPane
+                              activeFilePath={activeFile.path}
+                              activeFileContent={activeFileContent.content}
+                              onNavigate={handleNavigate}
+                            />
+                          </Editor>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="loading-editor"
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          height: "100%",
+                          color: "var(--text-faint)",
+                        }}
+                      >
+                        Loading...
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isZenMode && (
+                  <StatusBar activeFile={activeFile} stats={stats} />
                 )}
               </div>
             )}
-            
-            {!isZenMode && (
-              <StatusBar 
-                activeFile={activeFile} 
-                stats={stats} 
-              />
-            )}
           </div>
-        )}
+        </div>
       </div>
 
       {isAgentSidebarOpen && !isZenMode && (
         <>
-          <div 
+          <div
             className="sidebar-resizer right-resizer"
             onMouseDown={(e) => {
               e.preventDefault();
               const startX = e.clientX;
               const startWidth = agentSidebarWidth;
-              
+
               const onMouseMove = (moveEvent: MouseEvent) => {
-                const newWidth = Math.max(200, Math.min(800, startWidth - (moveEvent.clientX - startX)));
+                const newWidth = Math.max(
+                  200,
+                  Math.min(800, startWidth - (moveEvent.clientX - startX)),
+                );
                 setAgentSidebarWidth(newWidth);
               };
-              
+
               const onMouseUp = () => {
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
               };
-              
-              document.addEventListener('mousemove', onMouseMove);
-              document.addEventListener('mouseup', onMouseUp);
+
+              document.addEventListener("mousemove", onMouseMove);
+              document.addEventListener("mouseup", onMouseUp);
             }}
             style={{
-              width: '4px',
-              cursor: 'col-resize',
-              background: 'transparent',
-              position: 'relative',
-              zIndex: 10
+              width: "4px",
+              cursor: "col-resize",
+              background: "transparent",
+              position: "relative",
+              zIndex: 10,
             }}
           />
-          <div style={{ width: `${agentSidebarWidth}px`, flexShrink: 0, height: '100%', display: 'flex' }}>
-            <AgentSidebar 
-              activeFileContent={activeFileContent} 
-              vaultPath={vaultPath} 
+          <div
+            style={{
+              width: `${agentSidebarWidth}px`,
+              flexShrink: 0,
+              height: "100%",
+              display: "flex",
+            }}
+          >
+            <AgentSidebar
+              activeFileContent={activeFileContent}
+              vaultPath={vaultPath}
               messages={agentMessages}
               setMessages={setAgentMessages}
             />
@@ -782,7 +1467,7 @@ function App() {
         </>
       )}
 
-      <CommandPalette 
+      <CommandPalette
         isOpen={isCommandPaletteOpen}
         initialMode={paletteMode}
         onClose={() => setIsCommandPaletteOpen(false)}
@@ -791,10 +1476,10 @@ function App() {
         onFileSelect={handlePaletteSelect}
         hotkeys={settings.hotkeys}
       />
-      
-      <SettingsDialog 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
       {fileToDelete && (
         <ConfirmDeleteModal

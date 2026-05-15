@@ -4,7 +4,21 @@ pub mod mcp;
 pub mod server;
 
 use walkdir::WalkDir;
-use tauri::Manager;
+use tauri::{Manager, Emitter};
+use tauri_plugin_store::StoreExt;
+
+use std::sync::Arc;
+use tokio::sync::{Mutex, oneshot};
+use std::collections::HashMap;
+
+pub struct PendingApprovalsState(pub Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>);
+
+impl PendingApprovalsState {
+    pub fn inner(&self) -> &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> {
+        &self.0
+    }
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -44,6 +58,59 @@ async fn reload_mcp_servers(vault_path: String, app_handle: tauri::AppHandle) ->
     reload_mcp_servers_inner(vault_path, &mcp_manager).await
 }
 
+#[tauri::command]
+async fn open_agent_window(app_handle: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app_handle.get_webview_window("agent-workspace") {
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let result = tauri::WebviewWindowBuilder::new(
+        &app_handle,
+        "agent-workspace",
+        tauri::WebviewUrl::App("/?view=agent".into())
+    )
+    .title("Glade - Agent Workspace")
+    .inner_size(800.0, 600.0)
+    .build();
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to spawn window: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn build_agent(prompt: String, vault_path: String, app_handle: tauri::AppHandle) -> Result<agent::Agent, String> {
+    let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
+    let _ = stores.reload();
+    
+    let api_key_val = stores.get("gemini_api_key").ok_or("Gemini API Key not set in Settings")?;
+    let api_key = api_key_val.as_str().ok_or("Invalid API Key format")?;
+    
+    // Default to reasoning model, fallback to general if not set
+    let model = stores.get("model_reasoning").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-2.5-pro".to_string());
+    
+    let new_agent = agent::generate_agent_persona_inner(&prompt, &vault_path, api_key, &model).await?;
+    
+    // Broadcast update event
+    let _ = app_handle.emit("glade://vault-updated", ());
+    
+    Ok(new_agent)
+}
+
+#[tauri::command]
+async fn approve_agent_action(id: String, approved: bool, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let pending = app_handle.try_state::<PendingApprovalsState>().ok_or("No pending approvals state")?;
+    let mut map = pending.0.lock().await;
+    if let Some(tx) = map.remove(&id) {
+        let _ = tx.send(approved);
+        Ok(())
+    } else {
+        Err("Approval ID not found or already processed".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -58,6 +125,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .manage(mcp::McpManager::new())
+        .manage(PendingApprovalsState(Arc::new(Mutex::new(HashMap::new()))))
         .setup(|app| {
             let is_headless = std::env::args().any(|arg| arg == "--headless");
             
@@ -86,7 +154,10 @@ pub fn run() {
                 agent::save_agent,
                 agent::delete_agent,
                 agent::get_available_tools,
-                agent::get_available_skills
+                agent::get_available_skills,
+                open_agent_window,
+                build_agent,
+                approve_agent_action
             ])
             .build(tauri::generate_context!())
             .expect("error while running tauri application");

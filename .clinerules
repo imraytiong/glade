@@ -1,0 +1,88 @@
+# Glade Architecture Rules
+
+## RULE: The Headless Adapter Pattern (Strict Decoupling)
+
+**Context:** 
+During the Alpha 4 development phase, we established a strict "Headless Architecture & Frontend Decoupling" standard. The primary goal of this architecture is to ensure that the core business logic (e.g., the Multi-Agent System Engine, filesystem operations, and LLM integrations) can run completely headlessly—either via an Axum server, a CLI, or as an MCP server—without any dependencies on the Tauri framework UI layer.
+
+**The Rule:**
+You MUST ALWAYS use the Headless Adapter Pattern for any new backend feature or command implementation. You must never stray outside of this pattern.
+
+**Implementation Details:**
+1. **Pure Core Logic (`_inner` functions):**
+   - ALL core business logic MUST reside in pure Rust functions that have NO knowledge of Tauri.
+   - These functions MUST NOT accept `tauri::AppHandle`, `tauri::Window`, or any other Tauri-specific types as parameters.
+   - These functions MUST NOT emit Tauri events directly.
+   - If core logic requires configuration (e.g., API keys, model preferences, settings), those configurations MUST be passed in explicitly as standard Rust types (e.g., `api_key: &str`), rather than passing in a `tauri-plugin-store` reference or `AppHandle` to fetch them.
+
+2. **The Tauri Adapter Layer (`src-tauri/src/lib.rs`):**
+   - The `#[tauri::command]` functions exist STRICTLY as thin wrappers (adapters) around the pure core logic.
+   - The adapter layer is fully responsible for:
+     - Accessing the `tauri-plugin-store` to retrieve necessary configurations (e.g., extracting the Gemini API key).
+     - Calling the pure `_inner` Rust functions with the extracted configurations.
+     - Handling the response from the core logic.
+     - Emitting any Tauri-specific events (e.g., `app_handle.emit_all("glade://vault-updated", ())`) to synchronize the frontend UI.
+     - Mapping core logic errors to standard String or Tauri-compatible error responses.
+
+**Example of the Correct Pattern:**
+```rust
+// ❌ WRONG: Core logic depends on Tauri
+pub async fn invoke_agent(agent: Agent, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let store = app_handle.store("settings.json").unwrap();
+    // ... logic ...
+    app_handle.emit_all("agent-done", ()).unwrap();
+    Ok(())
+}
+
+// ✅ CORRECT: Pure Core Logic
+pub async fn invoke_agent_inner(agent: Agent, api_key: &str) -> Result<String, String> {
+    // ... pure logic ...
+    Ok("success".to_string())
+}
+
+// ✅ CORRECT: Tauri Adapter Wrapper
+#[tauri::command]
+pub async fn invoke_agent(agent: Agent, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let stores = app_handle.store("settings.json").map_err(|e| e.to_string())?;
+    let api_key = stores.get("api_key").unwrap().as_str().unwrap().to_string();
+    
+    let result = invoke_agent_inner(agent, &api_key).await?;
+    app_handle.emit_all("agent-done", result).map_err(|e| e.to_string())?;
+    Ok(())
+}
+```
+
+**Exceptions:**
+You must NEVER stray outside of this pattern unless given specific approval. If you run across a scenario that requires us to break this pattern (e.g., a core feature inherently requires managing an OS window), you MUST:
+1. Stop execution.
+2. Strictly ask the user for permission.
+3. Explicitly state that you are breaking the Headless Adapter Pattern and explain why it is unavoidable.
+
+---
+
+## RULE: Mandatory Verification Execution
+
+**Context:**
+To ensure system stability, especially given the headless integration and multi-agent systems, rigorous testing is mandatory at the end of every phase.
+
+**The Rule:**
+You MUST ALWAYS execute the Verification Plan expressly laid out in the implementation plan (e.g., the `ALPHA4_PLAN.md` or any active `implementation_plan.md`) EVERY TIME you complete a phase of implementation. 
+
+**Implementation Details:**
+- **No Exceptions:** You must never skip the verification step, no exceptions ever.
+- **E2E Testing:** If the phase dictates Playwright E2E tests, you must write them, run them via the terminal, and ensure they pass before moving on.
+- **Manual Verification:** If the phase dictates a manual validation step (like running a specific script or testing a UI flow), you must instruct the user to verify it or simulate it yourself if possible.
+- **Completion Criteria:** A phase is NOT considered "complete" until the Verification Plan has been successfully executed and its output validated.
+
+---
+
+## RULE: Comprehensive E2E Testing Mandate
+
+**Context:**
+To maintain a high standard of quality assurance and prevent regressions, End-to-End (E2E) testing coverage must aggressively expand alongside the codebase.
+
+**The Rule:**
+You MUST ALWAYS add new E2E tests in the following scenarios, with NO EXCEPTIONS EVER:
+1. **Implementing New Features:** Whenever a new feature is added as part of an implementation plan, you must write E2E tests that specifically cover the completed feature.
+2. **Bug Resolution:** When a bug is reported, you must FIRST create a representative E2E test to reproduce it. After fixing the issue, run the full suite of E2E tests to ensure no regressions.
+3. **Capability Gaps:** When a gap in capability is identified and needs to be fixed, you must write a representative E2E test to cover the newly introduced capability.

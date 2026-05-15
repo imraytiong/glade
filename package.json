@@ -1,7 +1,7 @@
 {
   "name": "glade",
   "private": true,
-  "version": "0.0.1-alpha.4",
+  "version": "0.0.1-alpha.5",
   "type": "module",
   "bin": {
     "glade": "./dist/cli/index.js"
@@ -17,6 +17,7 @@
     "start:headless": "cargo run --manifest-path src-tauri/Cargo.toml -- --headless"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@milkdown/core": "^7.21.0",
     "@milkdown/ctx": "^7.21.0",
     "@milkdown/plugin-block": "^7.21.0",
@@ -63,6 +64,7 @@
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.8.0",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

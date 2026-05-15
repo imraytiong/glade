@@ -3,7 +3,7 @@
 </p>
 
 # Glade
-**Version:** 0.0.1-alpha.4
+**Version:** 0.0.1-alpha.5
 
 > [!CAUTION]
 > **Extreme Alpha Warning**
@@ -13,8 +13,9 @@
 
 Built from the ground up to solve the clumsiness of bolt-on AI tools, Glade is an experimentation in creating a strictly local Personal Knowledge Management (PKM) system that treats a Multi-Agent System (MAS) as a core pillar. It brings together the best features of editors like Obsidian and Notion, but supercharges them with opinionated AI-native UX, the ability to connect your own local inference engines, and first-class support for interconnected cross-vault collections.
 
-### Core Features (Alpha 4)
+### Core Features (Alpha 5)
 - **Agent Command Center:** A context-aware chat interface integrated directly into the sidebar with multi-turn conversational memory.
+- **Fleet Builder:** A dedicated multi-window workspace to define specialized agent personas and curate their exact system prompts and tool access within your vault.
 - **Inline Refactoring:** Highlight text and use AI to rewrite, shorten, or elaborate without leaving your flow.
 - **Zero-Friction Prompting:** Type `/agent` to trigger generative AI commands that render beautifully directly into the editor as rich markdown.
 - **Pluggable Agentic Core:** Add custom markdown-based skills (`.agents/skills/`) to your vault, and natively execute Model Context Protocol (MCP) servers to extend Glade's capabilities.

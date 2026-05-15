@@ -232,3 +232,31 @@ async fn test_live_refactor_formatting() {
     assert!(text.contains("banana"));
     assert!(!text.to_lowercase().contains("here is the"));
 }
+
+#[test]
+fn test_parse_agent_markdown_valid() {
+    let md = r#"---
+name: Test Agent
+model_class: reasoning
+tools_allowed:
+  - read_file
+---
+
+This is the system prompt.
+"#;
+    let result = super::parse_agent_markdown("test_id".to_string(), md);
+    assert!(result.is_ok());
+    let agent = result.unwrap();
+    assert_eq!(agent.id, "test_id");
+    assert_eq!(agent.name, "Test Agent");
+    assert_eq!(agent.system_prompt, "This is the system prompt.");
+    assert_eq!(agent.model_class.unwrap(), "reasoning");
+    assert_eq!(agent.tools_allowed.unwrap().len(), 1);
+}
+
+#[test]
+fn test_parse_agent_markdown_missing_frontmatter() {
+    let md = "This is just text without frontmatter.";
+    let result = super::parse_agent_markdown("test".to_string(), md);
+    assert!(result.is_err());
+}

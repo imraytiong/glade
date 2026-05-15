@@ -8,9 +8,22 @@ use crate::gemini::{self, GeminiRequest, Content, Part, SystemInstruction, Funct
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum TraceEvent {
+    StepStarted,
+    ToolRequested { name: String, args: serde_json::Value },
+    ToolResult { name: String, result: serde_json::Value },
+    Error { message: String },
+    Completed,
+    ApprovalRequired { id: String, tool_name: String, args: serde_json::Value },
+    TextGenerated { text: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Agent {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub system_prompt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_class: Option<String>,
@@ -22,6 +35,8 @@ pub struct Agent {
     pub skills_allowed: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_internal_knowledge_fallback: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools_requiring_approval: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,9 +51,21 @@ pub struct ChatMessage {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AgentsConfig {
-    pub agents: Vec<Agent>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentFrontmatter {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools_allowed: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skills_allowed: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_internal_knowledge_fallback: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools_requiring_approval: Option<Vec<String>>,
 }
 
 pub struct AgentRegistry;
@@ -49,6 +76,7 @@ impl AgentRegistry {
             Agent {
                 id: "coordinator".to_string(),
                 name: "Coordinator".to_string(),
+                description: Some("The core Glade IDE assistant for general tasks and coordination.".to_string()),
                 system_prompt: "You are the Glade Coordinator Agent, a highly capable AI assistant embedded in the user's IDE. You help users manage their personal knowledge base. You are fully authorized and expected to use any tools provided to you (such as file reading/writing, terminal commands, etc.) to complete the user's requests. For general knowledge queries, you may use your internal knowledge if no external search tools are available. Use the provided active file context to assist the user.".to_string(),
                 model_class: Some("fast".to_string()),
                 tools: None,
@@ -61,25 +89,75 @@ impl AgentRegistry {
                 ]),
                 skills_allowed: Some(vec![]),
                 allow_internal_knowledge_fallback: Some(true),
+                tools_requiring_approval: None,
             },
             Agent {
                 id: "refactor".to_string(),
                 name: "Refactor".to_string(),
+                description: Some("Specialized agent for rewriting and refactoring text.".to_string()),
                 system_prompt: "You are an expert editor. You rewrite the user's provided text according to their prompt. Return ONLY the rewritten valid Markdown. Do not include introductory or conversational text like 'Here is the rewritten text:'.".to_string(),
                 model_class: Some("fast".to_string()),
                 tools: None,
-                tools_allowed: Some(vec![]),
-                skills_allowed: Some(vec![]),
+                tools_allowed: None,
+                skills_allowed: None,
                 allow_internal_knowledge_fallback: Some(true),
-            }
+                tools_requiring_approval: None,
+            },
         ]
     }
+}
+
+pub fn parse_agent_markdown(id: String, content: &str) -> Result<Agent, String> {
+    if !content.trim_start().starts_with("---") {
+        return Err("Markdown must start with ---".to_string());
+    }
+    
+    let parts: Vec<&str> = content.splitn(3, "---").collect();
+    if parts.len() < 3 {
+        return Err("Invalid frontmatter format".to_string());
+    }
+    
+    let frontmatter_str = parts[1];
+    let body = parts[2].trim().to_string();
+    
+    let frontmatter: AgentFrontmatter = serde_yaml::from_str(frontmatter_str)
+        .map_err(|e| format!("Failed to parse YAML frontmatter: {}", e))?;
+        
+    Ok(Agent {
+        id,
+        name: frontmatter.name,
+        description: frontmatter.description,
+        system_prompt: body,
+        model_class: frontmatter.model_class,
+        tools: None,
+        tools_allowed: frontmatter.tools_allowed,
+        skills_allowed: frontmatter.skills_allowed,
+        allow_internal_knowledge_fallback: frontmatter.allow_internal_knowledge_fallback,
+        tools_requiring_approval: frontmatter.tools_requiring_approval,
+    })
+}
+
+fn write_agent_markdown(agent: &Agent) -> Result<String, String> {
+    let frontmatter = AgentFrontmatter {
+        name: agent.name.clone(),
+        description: agent.description.clone(),
+        model_class: agent.model_class.clone(),
+        tools_allowed: agent.tools_allowed.clone(),
+        skills_allowed: agent.skills_allowed.clone(),
+        allow_internal_knowledge_fallback: agent.allow_internal_knowledge_fallback,
+        tools_requiring_approval: agent.tools_requiring_approval.clone(),
+    };
+    
+    let yaml = serde_yaml::to_string(&frontmatter)
+        .map_err(|e| format!("Failed to serialize YAML frontmatter: {}", e))?;
+        
+    Ok(format!("---\n{}---\n\n{}", yaml.trim(), agent.system_prompt.trim()))
 }
 
 #[tauri::command]
 pub async fn get_agents(vault_path: String) -> Result<Vec<Agent>, String> {
     let glade_dir = std::path::Path::new(&vault_path).join(".glade");
-    let agents_path = glade_dir.join("agents.json");
+    let agents_dir = glade_dir.join("agents");
     let default_skill_dir = glade_dir.join(".agents").join("skills").join("Research a Topic");
     
     // Ensure the default skill directory exists
@@ -91,60 +169,69 @@ pub async fn get_agents(vault_path: String) -> Result<Vec<Agent>, String> {
         }
     }
 
-    if !agents_path.exists() {
+    if !agents_dir.exists() {
+        let _ = std::fs::create_dir_all(&agents_dir);
         let defaults = AgentRegistry::get_default_agents();
-        let config = AgentsConfig { agents: defaults.clone() };
-        if let Ok(json) = serde_json::to_string_pretty(&config) {
-            let _ = std::fs::create_dir_all(agents_path.parent().unwrap());
-            let _ = std::fs::write(&agents_path, json);
+        for agent in &defaults {
+            if let Ok(md_content) = write_agent_markdown(agent) {
+                let file_path = agents_dir.join(format!("{}.agent.md", agent.id));
+                let _ = std::fs::write(&file_path, md_content);
+            }
         }
         return Ok(defaults);
     }
     
-    let content = std::fs::read_to_string(&agents_path).map_err(|e| format!("Failed to read agents.json: {}", e))?;
-    let config: AgentsConfig = serde_json::from_str(&content).map_err(|e| format!("Failed to parse agents.json: {}", e))?;
+    let mut agents = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&agents_dir) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
+                let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                if file_name.ends_with(".agent.md") {
+                    let id = file_name.trim_end_matches(".agent.md").to_string();
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        match parse_agent_markdown(id, &content) {
+                            Ok(agent) => agents.push(agent),
+                            Err(e) => eprintln!("Failed to parse agent {}: {}", file_name, e),
+                        }
+                    }
+                }
+            }
+        }
+    }
     
-    Ok(config.agents)
+    // Fallback if none could be read
+    if agents.is_empty() {
+        return Ok(AgentRegistry::get_default_agents());
+    }
+    
+    // Sort agents by name
+    agents.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(agents)
 }
 
 #[tauri::command]
 pub async fn save_agent(vault_path: String, agent: Agent) -> Result<(), String> {
-    let agents_path = std::path::Path::new(&vault_path).join(".glade").join("agents.json");
-    
-    let mut config = if agents_path.exists() {
-        let content = std::fs::read_to_string(&agents_path).map_err(|e| format!("Failed to read agents.json: {}", e))?;
-        serde_json::from_str::<AgentsConfig>(&content).map_err(|e| format!("Failed to parse agents.json: {}", e))?
-    } else {
-        AgentsConfig { agents: AgentRegistry::get_default_agents() }
-    };
-    
-    if let Some(existing) = config.agents.iter_mut().find(|a| a.id == agent.id) {
-        *existing = agent;
-    } else {
-        config.agents.push(agent);
+    let agents_dir = std::path::Path::new(&vault_path).join(".glade").join("agents");
+    if !agents_dir.exists() {
+        std::fs::create_dir_all(&agents_dir).map_err(|e| format!("Failed to create agents directory: {}", e))?;
     }
     
-    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("Failed to serialize agents: {}", e))?;
-    std::fs::write(&agents_path, json).map_err(|e| format!("Failed to write agents.json: {}", e))?;
+    let md_content = write_agent_markdown(&agent)?;
+    let file_path = agents_dir.join(format!("{}.agent.md", agent.id));
     
+    std::fs::write(&file_path, md_content).map_err(|e| format!("Failed to write agent file: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn delete_agent(vault_path: String, agent_id: String) -> Result<(), String> {
-    let agents_path = std::path::Path::new(&vault_path).join(".glade").join("agents.json");
-    if !agents_path.exists() {
-        return Ok(());
+    let agents_dir = std::path::Path::new(&vault_path).join(".glade").join("agents");
+    let file_path = agents_dir.join(format!("{}.agent.md", agent_id));
+    
+    if file_path.exists() {
+        std::fs::remove_file(&file_path).map_err(|e| format!("Failed to delete agent file: {}", e))?;
     }
-    
-    let content = std::fs::read_to_string(&agents_path).map_err(|e| format!("Failed to read agents.json: {}", e))?;
-    let mut config: AgentsConfig = serde_json::from_str(&content).map_err(|e| format!("Failed to parse agents.json: {}", e))?;
-    
-    config.agents.retain(|a| a.id != agent_id);
-    
-    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("Failed to serialize agents: {}", e))?;
-    std::fs::write(&agents_path, json).map_err(|e| format!("Failed to write agents.json: {}", e))?;
-    
     Ok(())
 }
 
@@ -248,6 +335,8 @@ pub async fn execute_agent(
     context: &str,
     base_url: Option<&str>,
     tool_executors: Option<&HashMap<String, Box<dyn tools::ToolExecutor>>>,
+    tracing_tx: Option<tokio::sync::mpsc::UnboundedSender<TraceEvent>>,
+    pending_approvals: Option<std::sync::Arc<tokio::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>>>,
 ) -> Result<String, String> {
     tracing::info!(
         target: "agent_execution",
@@ -347,7 +436,36 @@ pub async fn execute_agent(
                 "Agent requested function call"
             );
             
-            let result_val = if let Some(executors) = tool_executors {
+            if let Some(ref tx) = tracing_tx {
+                let _ = tx.send(TraceEvent::ToolRequested { name: fc.name.clone(), args: fc.args.clone() });
+            }
+
+            let requires_approval = match fc.name.as_str() {
+                "run_command" | "write_file" => true,
+                _ => false,
+            };
+
+            let mut approved = true;
+            if requires_approval {
+                if let Some(ref pending) = pending_approvals {
+                    let id = uuid::Uuid::new_v4().to_string();
+                    let (otx, orx) = tokio::sync::oneshot::channel();
+                    pending.lock().await.insert(id.clone(), otx);
+                    
+                    if let Some(ref tx) = tracing_tx {
+                        let _ = tx.send(TraceEvent::ApprovalRequired { 
+                            id: id.clone(), 
+                            tool_name: fc.name.clone(), 
+                            args: fc.args.clone() 
+                        });
+                    }
+                    approved = orx.await.unwrap_or(false);
+                }
+            }
+
+            let result_val = if !approved {
+                serde_json::json!({"error": "User denied execution of this tool."})
+            } else if let Some(executors) = tool_executors {
                 if let Some(executor) = executors.get(&fc.name) {
                     match executor.execute(fc.args.clone()).await {
                         Ok(res) => res,
@@ -360,6 +478,10 @@ pub async fn execute_agent(
                 serde_json::json!({"error": format!("No tool executors provided to handle '{}'", fc.name)})
             };
             
+            if let Some(ref tx) = tracing_tx {
+                let _ = tx.send(TraceEvent::ToolResult { name: fc.name.clone(), result: result_val.clone() });
+            }
+
             function_response_parts.push(Part::FunctionResponse(FunctionResponse {
                 name: fc.name,
                 response: result_val,
@@ -610,7 +732,7 @@ pub async fn invoke_agent(
     vault_path: Option<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle).await?;
+    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle.clone()).await?;
     
     let augmented_context = if let Some(ref vp) = vault_path {
         format!("Vault Absolute Path: {}\n{}", vp, context)
@@ -618,7 +740,19 @@ pub async fn invoke_agent(
         context
     };
 
-    execute_agent(&final_agent, &api_key, &model, &messages, &augmented_context, None, Some(&executors)).await
+    let pending_approvals = app_handle.try_state::<crate::PendingApprovalsState>().map(|s| s.inner().inner().clone());
+
+    let (tracing_tx, mut tracing_rx) = tokio::sync::mpsc::unbounded_channel();
+    
+    let app_handle_clone = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        use tauri::Emitter;
+        while let Some(event) = tracing_rx.recv().await {
+            let _ = app_handle_clone.emit("glade://agent-trace", event);
+        }
+    });
+
+    execute_agent(&final_agent, &api_key, &model, &messages, &augmented_context, None, Some(&executors), Some(tracing_tx), pending_approvals).await
 }
 
 pub fn execute_agent_stream(
@@ -629,6 +763,8 @@ pub fn execute_agent_stream(
     context: String,
     base_url: Option<String>,
     tool_executors: Option<std::sync::Arc<HashMap<String, Box<dyn tools::ToolExecutor>>>>,
+    tracing_tx: Option<tokio::sync::mpsc::UnboundedSender<TraceEvent>>,
+    pending_approvals: Option<std::sync::Arc<tokio::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>>>,
 ) -> impl futures::stream::Stream<Item = Result<String, String>> {
     async_stream::stream! {
         tracing::info!(
@@ -637,6 +773,9 @@ pub fn execute_agent_stream(
             model = %model,
             "Executing agent stream"
         );
+        if let Some(ref tx) = tracing_tx {
+            let _ = tx.send(TraceEvent::StepStarted);
+        }
 
         let mut history_contents = vec![];
         
@@ -691,6 +830,9 @@ pub fn execute_agent_stream(
                                         for part in parts {
                                             if let Some(text) = part.text {
                                                 full_text.push_str(&text);
+                                                if let Some(ref tx) = tracing_tx {
+                                                    let _ = tx.send(TraceEvent::TextGenerated { text: text.clone() });
+                                                }
                                                 yield Ok(text.clone());
                                             } else if let Some(fc) = part.function_call {
                                                 function_calls.push(fc);
@@ -729,7 +871,51 @@ pub fn execute_agent_stream(
             for fc in function_calls {
                 yield Ok(format!("\n\n*Running tool {}...*\n\n", fc.name));
                 
-                let result_val = if let Some(executors) = &tool_executors {
+                if let Some(ref tx) = tracing_tx {
+                    let _ = tx.send(TraceEvent::ToolRequested { name: fc.name.clone(), args: fc.args.clone() });
+                }
+
+                // Check for autonomous approval
+                let mut requires_approval = match fc.name.as_str() {
+                    "run_command" | "write_file" => true,
+                    _ => false,
+                };
+
+                let require_approval_override = agent.tools_requiring_approval.as_ref().map_or(false, |reqs| reqs.contains(&fc.name));
+
+                if requires_approval {
+                    let explicitly_allowed = agent.tools_allowed.as_ref().map_or(false, |tools| tools.contains(&fc.name));
+                    
+                    if explicitly_allowed && !require_approval_override {
+                        requires_approval = false;
+                    }
+                } else if require_approval_override {
+                    requires_approval = true;
+                }
+
+                let mut approved = true;
+                if requires_approval {
+                    if let Some(ref pending) = pending_approvals {
+                        let id = uuid::Uuid::new_v4().to_string();
+                        let (otx, orx) = tokio::sync::oneshot::channel();
+                        pending.lock().await.insert(id.clone(), otx);
+                        
+                        if let Some(ref tx) = tracing_tx {
+                            let _ = tx.send(TraceEvent::ApprovalRequired { 
+                                id: id.clone(), 
+                                tool_name: fc.name.clone(), 
+                                args: fc.args.clone() 
+                            });
+                        }
+                        
+                        yield Ok(format!("\n\n*Waiting for approval to run {}...*\n\n", fc.name));
+                        approved = orx.await.unwrap_or(false);
+                    }
+                }
+
+                let result_val = if !approved {
+                    serde_json::json!({"error": "User denied execution of this tool."})
+                } else if let Some(executors) = &tool_executors {
                     if let Some(executor) = executors.get(&fc.name) {
                         match executor.execute(fc.args.clone()).await {
                             Ok(res) => res,
@@ -742,6 +928,10 @@ pub fn execute_agent_stream(
                     serde_json::json!({"error": format!("No tool executors provided to handle '{}'", fc.name)})
                 };
                 
+                if let Some(ref tx) = tracing_tx {
+                    let _ = tx.send(TraceEvent::ToolResult { name: fc.name.clone(), result: result_val.clone() });
+                }
+                
                 function_response_parts.push(Part::FunctionResponse(FunctionResponse {
                     name: fc.name,
                     response: result_val,
@@ -753,7 +943,62 @@ pub fn execute_agent_stream(
                 parts: function_response_parts,
             });
         }
+        if let Some(ref tx) = tracing_tx {
+            let _ = tx.send(TraceEvent::Completed);
+        }
     }
+}
+
+pub async fn generate_agent_persona_inner(
+    prompt: &str,
+    _vault_path: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<Agent, String> {
+    let system_instruction = gemini::SystemInstruction {
+        parts: vec![gemini::Part::Text(
+            "You are an expert AI persona architect. The user will describe an agent they want to build. You must output a JSON object representing this agent's configuration. The JSON MUST conform exactly to the following structure and be raw JSON (no markdown block formatting, no backticks).
+            {
+                \"id\": \"short_unique_id\",
+                \"name\": \"Human Readable Name\",
+                \"system_prompt\": \"The detailed instructions and persona for the agent. Make it highly capable and explicit.\",
+                \"model_class\": \"reasoning\" or \"large\" or \"fast\",
+                \"tools_allowed\": [\"read_file\", \"write_file\", \"list_directory\", \"search_files\", \"run_command\"],
+                \"skills_allowed\": [],
+                \"allow_internal_knowledge_fallback\": true,
+                \"tools_requiring_approval\": [\"write_file\", \"run_command\"]
+            }".to_string()
+        )],
+    };
+
+    let request = gemini::GeminiRequest {
+        contents: vec![gemini::Content {
+            role: "user".to_string(),
+            parts: vec![gemini::Part::Text(prompt.to_string())],
+        }],
+        system_instruction: Some(system_instruction),
+        tools: None,
+    };
+
+    let response = gemini::call_gemini(api_key, model, &request, None).await.map_err(|e| e.to_string())?;
+
+    let output_text = response.candidates
+        .and_then(|mut c| c.pop())
+        .and_then(|c| c.content)
+        .and_then(|mut content| content.parts.take())
+        .and_then(|mut parts| parts.pop())
+        .and_then(|p| p.text)
+        .unwrap_or_default();
+
+    let cleaned_text = output_text.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
+    let new_agent: Agent = serde_json::from_str(cleaned_text).map_err(|e| format!("Failed to parse JSON agent: {}", e))?;
+
+    Ok(new_agent)
 }
 
 pub async fn invoke_agent_stream(
@@ -778,9 +1023,38 @@ pub async fn invoke_agent_stream(
         messages,
         augmented_context,
         None,
-        Some(std::sync::Arc::new(executors))
+        Some(std::sync::Arc::new(executors)),
+        None,
+        None
     ))
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_and_write_agent() {
+        let agent = Agent {
+            id: "test".to_string(),
+            name: "Test Agent".to_string(),
+            description: Some("desc".to_string()),
+            system_prompt: "body".to_string(),
+            model_class: Some("fast".to_string()),
+            tools: None,
+            tools_allowed: Some(vec!["tool1".to_string(), "tool2".to_string()]),
+            skills_allowed: Some(vec![]),
+            allow_internal_knowledge_fallback: Some(true),
+            tools_requiring_approval: None,
+        };
+
+        let md = write_agent_markdown(&agent).unwrap();
+        println!("MD:\n{}", md);
+
+        let parsed = parse_agent_markdown("test".to_string(), &md).unwrap();
+        println!("PARSED: {:?}", parsed);
+    }
+}
