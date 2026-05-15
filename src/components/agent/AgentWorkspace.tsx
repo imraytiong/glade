@@ -780,9 +780,15 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                               !formData.system_prompt
                             }
                             style={{
-                              background: "var(--interactive-accent)",
-                              color: "white",
+                              background: (!isDirty || isSaving || !formData.name || !formData.system_prompt) ? "var(--background-modifier-hover)" : "var(--interactive-accent)",
+                              color: (!isDirty || isSaving || !formData.name || !formData.system_prompt) ? "var(--text-muted)" : "white",
                               padding: "10px 24px",
+                              transition: "all 0.2s ease-in-out",
+                              cursor: (!isDirty || isSaving || !formData.name || !formData.system_prompt) ? "not-allowed" : "pointer",
+                              opacity: (!isDirty || isSaving || !formData.name || !formData.system_prompt) ? 0.6 : 1,
+                              transform: (isDirty && !isSaving && formData.name && formData.system_prompt) ? "scale(1.02)" : "scale(1)",
+                              boxShadow: (isDirty && !isSaving && formData.name && formData.system_prompt) ? "0 4px 12px rgba(0,0,0,0.2)" : "none",
+                              fontWeight: "bold",
                             }}
                           >
                             {isSaving ? "Saving..." : "Save Agent"}
