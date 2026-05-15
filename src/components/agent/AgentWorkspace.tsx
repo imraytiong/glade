@@ -505,6 +505,7 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                             style={{
                               fontWeight: "bold",
                               whiteSpace: "nowrap",
+                              width: "100px",
                             }}
                           >
                             Name
@@ -527,12 +528,12 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                           />
                         </div>
 
-                        <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                           <label
                             style={{
-                              display: "block",
-                              marginBottom: "8px",
                               fontWeight: "bold",
+                              whiteSpace: "nowrap",
+                              width: "100px",
                             }}
                           >
                             Description
@@ -544,8 +545,8 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                               setFormData({ ...formData, description: e.target.value })
                             }
                             style={{
-                              width: "100%",
-                              padding: "10px",
+                              width: "250px",
+                              padding: "8px 12px",
                               borderRadius: "6px",
                               border:
                                 "1px solid var(--background-modifier-border)",
@@ -555,12 +556,12 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                           />
                         </div>
 
-                        <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                           <label
                             style={{
-                              display: "block",
-                              marginBottom: "8px",
                               fontWeight: "bold",
+                              whiteSpace: "nowrap",
+                              width: "100px",
                             }}
                           >
                             Model Class
@@ -574,8 +575,8 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                               })
                             }
                             style={{
-                              width: "100%",
-                              padding: "10px",
+                              width: "250px",
+                              padding: "8px 12px",
                               borderRadius: "6px",
                               border:
                                 "1px solid var(--background-modifier-border)",
