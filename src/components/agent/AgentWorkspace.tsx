@@ -500,12 +500,11 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                           gap: "16px",
                         }}
                       >
-                        <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                           <label
                             style={{
-                              display: "block",
-                              marginBottom: "8px",
                               fontWeight: "bold",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             Name
@@ -517,8 +516,8 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                               setFormData({ ...formData, name: e.target.value })
                             }
                             style={{
-                              width: "100%",
-                              padding: "10px",
+                              width: "250px",
+                              padding: "8px 12px",
                               borderRadius: "6px",
                               border:
                                 "1px solid var(--background-modifier-border)",
