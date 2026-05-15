@@ -12,6 +12,7 @@ interface Agent {
   tools_allowed?: string[];
   skills_allowed?: string[];
   tools_requiring_approval?: string[];
+  context_bank?: string[];
 }
 
 export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
@@ -80,7 +81,9 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
       JSON.stringify((agent.tools_allowed || []).slice().sort()) !==
         JSON.stringify((formData.tools_allowed || []).slice().sort()) ||
       JSON.stringify((agent.tools_requiring_approval || []).slice().sort()) !==
-        JSON.stringify((formData.tools_requiring_approval || []).slice().sort());
+        JSON.stringify((formData.tools_requiring_approval || []).slice().sort()) ||
+      JSON.stringify((agent.context_bank || []).slice().sort()) !==
+        JSON.stringify((formData.context_bank || []).slice().sort());
 
     setIsDirty(isChanged);
   }, [formData, selectedAgentId, agents]);
@@ -100,6 +103,7 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
         tools_allowed: [...availableTools],
         skills_allowed: [],
         tools_requiring_approval: [],
+        context_bank: [],
       });
     } else if (id) {
       const agent = agents.find((a) => a.id === id);
@@ -711,6 +715,80 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                                 </div>
                               );
                             })}
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: "24px" }}>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Memory (Context Bank)
+                          </label>
+                          <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "8px" }}>
+                            Specify files to inject into the agent's memory (e.g., `knowledge/rules.md`).
+                          </p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {(formData.context_bank || []).map((path, idx) => (
+                              <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <div style={{ flex: 1, padding: "8px 12px", background: "var(--background-secondary)", borderRadius: "6px", border: "1px solid var(--background-modifier-border)", fontSize: "13px" }}>
+                                  {path}
+                                </div>
+                                <button
+                                  className="btn"
+                                  onClick={() => {
+                                    const newBank = [...(formData.context_bank || [])];
+                                    newBank.splice(idx, 1);
+                                    setFormData({ ...formData, context_bank: newBank });
+                                  }}
+                                  style={{ color: "#f05050" }}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                              <input
+                                type="text"
+                                placeholder="Path to file..."
+                                id="new-context-bank-path"
+                                style={{
+                                  flex: 1,
+                                  padding: "8px 12px",
+                                  borderRadius: "6px",
+                                  border: "1px solid var(--background-modifier-border)",
+                                  background: "var(--background-primary)",
+                                  color: "var(--text-normal)",
+                                  fontSize: "13px"
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const target = e.target as HTMLInputElement;
+                                    const val = target.value.trim();
+                                    if (val && !(formData.context_bank || []).includes(val)) {
+                                      setFormData({ ...formData, context_bank: [...(formData.context_bank || []), val] });
+                                      target.value = "";
+                                    }
+                                  }
+                                }}
+                              />
+                              <button
+                                className="btn"
+                                onClick={() => {
+                                  const input = document.getElementById("new-context-bank-path") as HTMLInputElement;
+                                  const val = input.value.trim();
+                                  if (val && !(formData.context_bank || []).includes(val)) {
+                                    setFormData({ ...formData, context_bank: [...(formData.context_bank || []), val] });
+                                    input.value = "";
+                                  }
+                                }}
+                              >
+                                Add
+                              </button>
+                            </div>
                           </div>
                         </div>
 

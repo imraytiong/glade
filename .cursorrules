@@ -86,3 +86,18 @@ You MUST ALWAYS add new E2E tests in the following scenarios, with NO EXCEPTIONS
 1. **Implementing New Features:** Whenever a new feature is added as part of an implementation plan, you must write E2E tests that specifically cover the completed feature.
 2. **Bug Resolution:** When a bug is reported, you must FIRST create a representative E2E test to reproduce it. After fixing the issue, run the full suite of E2E tests to ensure no regressions.
 3. **Capability Gaps:** When a gap in capability is identified and needs to be fixed, you must write a representative E2E test to cover the newly introduced capability.
+
+---
+
+## RULE: Development Phase Branching
+
+**Context:**
+To keep the main branch clean and stable, all major phase development work must occur in dedicated branches.
+
+**The Rule:**
+You MUST ALWAYS start each phase of development in its own branch. 
+
+**Implementation Details:**
+- For example, work for the "alpha6" phase should be done in a branch named `alpha6` (e.g. via `git checkout -b alpha6`).
+- Never commit phase development work directly to `main` or `master`.
+- Code should only be merged into `main` at the end of the phase after all work, including documentation and verification, is complete and the user has authorized the merge.

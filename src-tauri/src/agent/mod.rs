@@ -37,6 +37,8 @@ pub struct Agent {
     pub allow_internal_knowledge_fallback: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools_requiring_approval: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_bank: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,6 +68,8 @@ pub struct AgentFrontmatter {
     pub allow_internal_knowledge_fallback: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools_requiring_approval: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_bank: Option<Vec<String>>,
 }
 
 pub struct AgentRegistry;
@@ -90,6 +94,7 @@ impl AgentRegistry {
                 skills_allowed: Some(vec![]),
                 allow_internal_knowledge_fallback: Some(true),
                 tools_requiring_approval: None,
+                context_bank: None,
             },
             Agent {
                 id: "refactor".to_string(),
@@ -102,6 +107,7 @@ impl AgentRegistry {
                 skills_allowed: None,
                 allow_internal_knowledge_fallback: Some(true),
                 tools_requiring_approval: None,
+                context_bank: None,
             },
         ]
     }
@@ -134,6 +140,7 @@ pub fn parse_agent_markdown(id: String, content: &str) -> Result<Agent, String> 
         skills_allowed: frontmatter.skills_allowed,
         allow_internal_knowledge_fallback: frontmatter.allow_internal_knowledge_fallback,
         tools_requiring_approval: frontmatter.tools_requiring_approval,
+        context_bank: frontmatter.context_bank,
     })
 }
 
@@ -146,6 +153,7 @@ fn write_agent_markdown(agent: &Agent) -> Result<String, String> {
         skills_allowed: agent.skills_allowed.clone(),
         allow_internal_knowledge_fallback: agent.allow_internal_knowledge_fallback,
         tools_requiring_approval: agent.tools_requiring_approval.clone(),
+        context_bank: agent.context_bank.clone(),
     };
     
     let yaml = serde_yaml::to_string(&frontmatter)
@@ -617,6 +625,19 @@ async fn prepare_agent_execution(
                 if full_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(full_path) {
                         combined_system_prompt.push_str("\n\n--- SKILL PROVIDED ---\n");
+                        combined_system_prompt.push_str(&content);
+                    }
+                }
+            }
+        }
+
+        // Inject context bank memories
+        if let Some(context_bank) = &agent.context_bank {
+            for memory_path in context_bank {
+                let full_path = std::path::Path::new(path).join(memory_path);
+                if full_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&full_path) {
+                        combined_system_prompt.push_str(&format!("\n\n--- MEMORY ({}) ---\n", memory_path));
                         combined_system_prompt.push_str(&content);
                     }
                 }
