@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import GladeEditor from "../Editor";
+import FileSelector from "./FileSelector";
 
 interface Agent {
   id: string;
@@ -751,43 +752,19 @@ export default function AgentWorkspace({ isActive }: { isActive?: boolean }) {
                               </div>
                             ))}
                             <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                              <input
-                                type="text"
-                                placeholder="Path to file..."
-                                id="new-context-bank-path"
-                                style={{
-                                  flex: 1,
-                                  padding: "8px 12px",
-                                  borderRadius: "6px",
-                                  border: "1px solid var(--background-modifier-border)",
-                                  background: "var(--background-primary)",
-                                  color: "var(--text-normal)",
-                                  fontSize: "13px"
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    const target = e.target as HTMLInputElement;
-                                    const val = target.value.trim();
-                                    if (val && !(formData.context_bank || []).includes(val)) {
-                                      setFormData({ ...formData, context_bank: [...(formData.context_bank || []), val] });
-                                      target.value = "";
+                              <FileSelector
+                                vaultPath={vaultPath}
+                                selectedFiles={formData.context_bank || []}
+                                onAddFiles={(paths) => {
+                                  const newBank = [...(formData.context_bank || [])];
+                                  for (const p of paths) {
+                                    if (!newBank.includes(p)) {
+                                      newBank.push(p);
                                     }
                                   }
+                                  setFormData({ ...formData, context_bank: newBank });
                                 }}
                               />
-                              <button
-                                className="btn"
-                                onClick={() => {
-                                  const input = document.getElementById("new-context-bank-path") as HTMLInputElement;
-                                  const val = input.value.trim();
-                                  if (val && !(formData.context_bank || []).includes(val)) {
-                                    setFormData({ ...formData, context_bank: [...(formData.context_bank || []), val] });
-                                    input.value = "";
-                                  }
-                                }}
-                              >
-                                Add
-                              </button>
                             </div>
                           </div>
                         </div>
