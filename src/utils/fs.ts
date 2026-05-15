@@ -107,3 +107,14 @@ export function flattenFiles(nodes: FileNode[]): FileNode[] {
   }
   return result;
 }
+
+export function flattenNodes(nodes: FileNode[]): FileNode[] {
+  let result: FileNode[] = [];
+  for (const node of nodes) {
+    result.push(node);
+    if (node.isDirectory && node.children) {
+      result = result.concat(flattenNodes(node.children));
+    }
+  }
+  return result;
+}

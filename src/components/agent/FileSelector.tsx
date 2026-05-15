@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, FolderOpen, X, Check } from 'lucide-react';
-import { readVaultRecursive, flattenFiles, FileNode } from '../../utils/fs';
+import { Search, FolderOpen, X, Check, FileText } from 'lucide-react';
+import { readVaultRecursive, flattenNodes, FileNode } from '../../utils/fs';
 
 interface FileSelectorProps {
   vaultPath: string;
@@ -18,7 +18,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
   useEffect(() => {
     const loadFiles = async () => {
       const nodes = await readVaultRecursive(vaultPath);
-      const flat = flattenFiles(nodes);
+      const flat = flattenNodes(nodes);
       // Ensure paths are relative to vaultPath for the context bank
       const relativeFiles = flat.map(f => ({
         ...f,
@@ -107,11 +107,15 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
                     padding: '8px 12px',
                     cursor: 'pointer',
                     fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                     borderBottom: '1px solid var(--background-modifier-border)'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'var(--background-modifier-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
+                  {f.isDirectory ? <FolderOpen size={14} color="var(--text-muted)" /> : <FileText size={14} color="var(--text-muted)" />}
                   {f.path}
                 </div>
               ))}
@@ -163,9 +167,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
                     <div
                       key={f.path}
                       onClick={() => {
-                        if (isSelected) {
-                           // They can remove it from the list above instead, or we can toggle it
-                        } else {
+                        if (!isSelected) {
                            onAddFiles([f.path]);
                         }
                       }}
@@ -182,7 +184,10 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
                         border: '1px solid var(--background-modifier-border)'
                       }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                        {f.isDirectory ? <FolderOpen size={14} color={isSelected ? 'white' : 'var(--text-muted)'} /> : <FileText size={14} color={isSelected ? 'white' : 'var(--text-muted)'} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</span>
+                      </div>
                       {isSelected && <Check size={14} />}
                     </div>
                   );

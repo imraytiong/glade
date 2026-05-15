@@ -636,9 +636,26 @@ async fn prepare_agent_execution(
             for memory_path in context_bank {
                 let full_path = std::path::Path::new(path).join(memory_path);
                 if full_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&full_path) {
-                        combined_system_prompt.push_str(&format!("\n\n--- MEMORY ({}) ---\n", memory_path));
-                        combined_system_prompt.push_str(&content);
+                    if full_path.is_file() {
+                        if let Ok(content) = std::fs::read_to_string(&full_path) {
+                            combined_system_prompt.push_str(&format!("\n\n--- MEMORY ({}) ---\n", memory_path));
+                            combined_system_prompt.push_str(&content);
+                        }
+                    } else if full_path.is_dir() {
+                        // Recursively read all files in directory
+                        let walker = walkdir::WalkDir::new(&full_path).into_iter().filter_map(|e| e.ok());
+                        for entry in walker {
+                            if entry.file_type().is_file() {
+                                let path_str = entry.path().to_string_lossy().to_string();
+                                if path_str.ends_with(".md") || path_str.ends_with(".txt") {
+                                    if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                                        let rel_path = entry.path().strip_prefix(std::path::Path::new(path)).unwrap_or(entry.path()).to_string_lossy().to_string();
+                                        combined_system_prompt.push_str(&format!("\n\n--- MEMORY ({}) ---\n", rel_path));
+                                        combined_system_prompt.push_str(&content);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
