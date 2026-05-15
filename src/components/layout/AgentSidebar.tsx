@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { invoke } from '../../utils/api';
-import { Send, Bot, User } from 'lucide-react';
+import { listen } from '@tauri-apps/api/event';
+import { Send, Bot, User, Trash2 } from 'lucide-react';
 import { useError } from '../../contexts/ErrorContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +11,7 @@ export interface Message {
   id: string;
   role: 'user' | 'agent';
   content: string;
+  pendingApproval?: { id: string, tool_name: string, args: any };
 }
 
 import { Agent } from '../../types/agent';
@@ -19,11 +21,12 @@ interface AgentSidebarProps {
   vaultPath: string | null;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  activeAgentChatId: string;
+  setActiveAgentChatId: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export default function AgentSidebar({ activeFileContent, vaultPath, messages, setMessages }: AgentSidebarProps) {
+export default function AgentSidebar({ activeFileContent, vaultPath, messages, setMessages, activeAgentChatId, setActiveAgentChatId }: AgentSidebarProps) {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('coordinator');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -46,8 +49,8 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
           setAgents(fetchedAgents);
           // If the previously selected agent doesn't exist anymore, reset it
           setAgents((currentAgents) => {
-             if (!currentAgents.find((a: Agent) => a.id === selectedAgentId)) {
-                setSelectedAgentId(fetchedAgents[0].id);
+             if (!currentAgents.find((a: Agent) => a.id === activeAgentChatId)) {
+                setActiveAgentChatId(fetchedAgents[0].id);
              }
              return fetchedAgents;
           });
@@ -63,7 +66,67 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
     };
     window.addEventListener('agents-updated', handleAgentsUpdated);
     return () => window.removeEventListener('agents-updated', handleAgentsUpdated);
-  }, [vaultPath, selectedAgentId]);
+  }, [vaultPath, activeAgentChatId, setActiveAgentChatId]);
+
+  useEffect(() => {
+    if (!vaultPath || !activeAgentChatId) return;
+    const loadThread = async () => {
+      try {
+        const loadedMessages = await invoke<Message[]>('load_thread', { vaultPath, threadId: `agent_${activeAgentChatId}` });
+        setMessages(loadedMessages || []);
+      } catch (err) {
+        console.error("Failed to load thread", err);
+      }
+    };
+    loadThread();
+  }, [vaultPath, activeAgentChatId, setMessages]);
+
+  useEffect(() => {
+    const unlisten = listen('glade://agent-trace', (event: any) => {
+      const payload = event.payload;
+      if (typeof payload === 'object' && payload !== null) {
+        if ('ApprovalRequired' in payload) {
+          const approvalReq = payload.ApprovalRequired;
+          setMessages(prev => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              role: 'agent',
+              content: `Approval required for tool: ${approvalReq.tool_name}`,
+              pendingApproval: approvalReq
+            }
+          ]);
+        }
+      }
+    });
+
+    return () => {
+      unlisten.then(f => f());
+    };
+  }, [setMessages]);
+
+  const handleApproval = async (id: string, approved: boolean, msgId: string) => {
+    try {
+      await invoke('approve_agent_action', { id, approved });
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === msgId) {
+          return { ...msg, content: msg.content + (approved ? '\n**(Approved)**' : '\n**(Denied)**'), pendingApproval: undefined };
+        }
+        return msg;
+      }));
+    } catch (e) {
+      console.error("Failed to submit approval", e);
+    }
+  };
+
+  const handleClearChat = async () => {
+    setMessages([]);
+    try {
+      await invoke('clear_thread', { vaultPath, threadId: `agent_${activeAgentChatId}` });
+    } catch (e) {
+      console.error("Failed to clear chat thread", e);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -79,7 +142,13 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
     setIsLoading(true);
 
     try {
-      const selectedAgent = agents.find(a => a.id === selectedAgentId) || {
+      await invoke('append_message_to_thread', { vaultPath, threadId: `agent_${activeAgentChatId}`, message: userMessage });
+    } catch (e) {
+      console.error("Failed to save user message", e);
+    }
+
+    try {
+      const selectedAgent = agents.find(a => a.id === activeAgentChatId) || {
         id: "coordinator",
         name: "Coordinator",
         system_prompt: "You are the Glade Coordinator Agent. You help users manage their personal knowledge base. Use the provided active file context to answer questions accurately. Do not make up information.",
@@ -100,6 +169,13 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
       };
 
       setMessages(prev => [...prev, agentMessage]);
+      
+      try {
+        await invoke('append_message_to_thread', { vaultPath, threadId: `agent_${activeAgentChatId}`, message: agentMessage });
+      } catch (e) {
+        console.error("Failed to save agent message", e);
+      }
+      
       window.dispatchEvent(new Event('vault-files-changed'));
     } catch (error) {
       console.error('Agent error:', error);
@@ -139,8 +215,8 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
           <span className="sidebar-title">Glade Agent</span>
         </div>
         <select 
-          value={selectedAgentId} 
-          onChange={(e) => setSelectedAgentId(e.target.value)}
+          value={activeAgentChatId} 
+          onChange={(e) => setActiveAgentChatId(e.target.value)}
           style={{
             background: 'var(--background-primary)',
             border: '1px solid var(--background-modifier-border)',
@@ -159,6 +235,20 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
             ))
           )}
         </select>
+        <button 
+          onClick={handleClearChat}
+          title="Clear Chat History"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '4px',
+            marginLeft: 'auto'
+          }}
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
       
       <div className="agent-messages">
@@ -179,6 +269,22 @@ export default function AgentSidebar({ activeFileContent, vaultPath, messages, s
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {msg.content}
                 </ReactMarkdown>
+              )}
+              {msg.pendingApproval && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button 
+                    onClick={() => handleApproval(msg.pendingApproval!.id, true, msg.id)}
+                    style={{ background: 'var(--accent-color)', color: 'white', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', flex: 1 }}
+                  >
+                    Approve
+                  </button>
+                  <button 
+                    onClick={() => handleApproval(msg.pendingApproval!.id, false, msg.id)}
+                    style={{ background: 'var(--background-modifier-hover)', color: 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', flex: 1 }}
+                  >
+                    Deny
+                  </button>
+                </div>
               )}
             </div>
           </div>

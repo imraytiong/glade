@@ -81,8 +81,18 @@ const FileExplorerNode: React.FC<{
     }
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (node.isDirectory) {
+      setIsDragOver(true);
+      e.dataTransfer.dropEffect = 'move';
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (node.isDirectory) {
       setIsDragOver(true);
       e.dataTransfer.dropEffect = 'move';
@@ -95,30 +105,36 @@ const FileExplorerNode: React.FC<{
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
     if (!node.isDirectory) return;
 
     try {
-      const data = e.dataTransfer.getData('application/glade-file');
+      const data = e.dataTransfer.getData('application/glade-file') || e.dataTransfer.getData('text/plain');
       if (data) {
         const fileInfo = JSON.parse(data);
         if (onMove && fileInfo.path !== node.path) {
            onMove(fileInfo.path, node.path);
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Drop parsing error:", err);
+    }
   };
 
   if (node.isDirectory) {
     return (
-      <div className={`folder-node ${isDragOver ? 'drag-over' : ''}`}>
+      <div 
+        className={`folder-node ${isDragOver ? 'drag-over' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div 
           className="folder-header" 
           style={{ paddingLeft }}
           onClick={() => setIsOpen(!isOpen)}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
         >
           <span className="folder-icon">
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -199,8 +215,10 @@ const FileExplorerNode: React.FC<{
       }}
       draggable={!isEditing}
       onDragStart={(e) => {
-        e.dataTransfer.setData('application/glade-file', JSON.stringify({ name: node.name, path: node.path }));
-        e.dataTransfer.effectAllowed = 'copyLink';
+        const payload = JSON.stringify({ name: node.name, path: node.path });
+        e.dataTransfer.setData('application/glade-file', payload);
+        e.dataTransfer.setData('text/plain', payload);
+        e.dataTransfer.effectAllowed = 'move';
       }}
     >
       <FileText size={14} className="file-icon" />

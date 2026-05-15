@@ -1,5 +1,7 @@
 pub mod tools;
 pub mod mcp_tool;
+pub mod shadow_fs;
+pub mod memory;
 
 use serde::{Deserialize, Serialize};
 use tauri_plugin_store::StoreExt;
@@ -39,6 +41,14 @@ pub struct Agent {
     pub tools_requiring_approval: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_bank: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_zones: Option<Vec<ZoneRule>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ZoneRule {
+    pub path: String,
+    pub permission: String, // "read", "write", "read_preferred", "deny", "append_only"
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -47,7 +57,7 @@ pub struct ToolInfo {
     pub description: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
@@ -70,6 +80,8 @@ pub struct AgentFrontmatter {
     pub tools_requiring_approval: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_bank: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_zones: Option<Vec<ZoneRule>>,
 }
 
 pub struct AgentRegistry;
@@ -95,6 +107,7 @@ impl AgentRegistry {
                 allow_internal_knowledge_fallback: Some(true),
                 tools_requiring_approval: None,
                 context_bank: None,
+                allowed_zones: None,
             },
             Agent {
                 id: "refactor".to_string(),
@@ -108,6 +121,7 @@ impl AgentRegistry {
                 allow_internal_knowledge_fallback: Some(true),
                 tools_requiring_approval: None,
                 context_bank: None,
+                allowed_zones: None,
             },
         ]
     }
@@ -141,6 +155,7 @@ pub fn parse_agent_markdown(id: String, content: &str) -> Result<Agent, String> 
         allow_internal_knowledge_fallback: frontmatter.allow_internal_knowledge_fallback,
         tools_requiring_approval: frontmatter.tools_requiring_approval,
         context_bank: frontmatter.context_bank,
+        allowed_zones: frontmatter.allowed_zones,
     })
 }
 
@@ -154,19 +169,20 @@ fn write_agent_markdown(agent: &Agent) -> Result<String, String> {
         allow_internal_knowledge_fallback: agent.allow_internal_knowledge_fallback,
         tools_requiring_approval: agent.tools_requiring_approval.clone(),
         context_bank: agent.context_bank.clone(),
+        allowed_zones: agent.allowed_zones.clone(),
     };
     
     let yaml = serde_yaml::to_string(&frontmatter)
         .map_err(|e| format!("Failed to serialize YAML frontmatter: {}", e))?;
         
-    Ok(format!("---\n{}---\n\n{}", yaml.trim(), agent.system_prompt.trim()))
+    Ok(format!("---\n{}\n---\n\n{}", yaml.trim(), agent.system_prompt.trim()))
 }
 
 #[tauri::command]
 pub async fn get_agents(vault_path: String) -> Result<Vec<Agent>, String> {
     let glade_dir = std::path::Path::new(&vault_path).join(".glade");
     let agents_dir = glade_dir.join("agents");
-    let default_skill_dir = glade_dir.join(".agents").join("skills").join("Research a Topic");
+    let default_skill_dir = glade_dir.join("agents").join("skills").join("Research a Topic");
     
     // Ensure the default skill directory exists
     if !default_skill_dir.exists() {
@@ -219,6 +235,12 @@ pub async fn get_agents(vault_path: String) -> Result<Vec<Agent>, String> {
 }
 
 #[tauri::command]
+pub async fn get_agent_logs(vault_path: String, agent_id: String) -> Result<String, String> {
+    crate::agent::shadow_fs::read_execution_log(&vault_path, &agent_id)
+        .map_err(|e| format!("Failed to read execution log: {}", e))
+}
+
+#[tauri::command]
 pub async fn save_agent(vault_path: String, agent: Agent) -> Result<(), String> {
     let agents_dir = std::path::Path::new(&vault_path).join(".glade").join("agents");
     if !agents_dir.exists() {
@@ -241,6 +263,24 @@ pub async fn delete_agent(vault_path: String, agent_id: String) -> Result<(), St
         std::fs::remove_file(&file_path).map_err(|e| format!("Failed to delete agent file: {}", e))?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn load_thread(vault_path: String, thread_id: String) -> Result<Vec<ChatMessage>, String> {
+    let thread_manager = crate::agent::memory::ThreadManager::new(&vault_path);
+    thread_manager.load_thread(&thread_id)
+}
+
+#[tauri::command]
+pub async fn append_message_to_thread(vault_path: String, thread_id: String, message: ChatMessage) -> Result<(), String> {
+    let thread_manager = crate::agent::memory::ThreadManager::new(&vault_path);
+    thread_manager.append_message(&thread_id, message)
+}
+
+#[tauri::command]
+pub async fn clear_thread(vault_path: String, thread_id: String) -> Result<(), String> {
+    let thread_manager = crate::agent::memory::ThreadManager::new(&vault_path);
+    thread_manager.clear_thread(&thread_id)
 }
 
 pub async fn get_available_tools_inner(mcp_manager: &crate::mcp::McpManager) -> Result<Vec<ToolInfo>, String> {
@@ -293,9 +333,15 @@ pub struct SkillInfo {
     pub description: String,
 }
 
+#[derive(serde::Deserialize)]
+struct SkillFrontmatter {
+    name: String,
+    description: Option<String>,
+}
+
 #[tauri::command]
 pub async fn get_available_skills(vault_path: String) -> Result<Vec<SkillInfo>, String> {
-    let skills_dir = std::path::Path::new(&vault_path).join(".glade").join(".agents").join("skills");
+    let skills_dir = std::path::Path::new(&vault_path).join(".glade").join("agents").join("skills");
     let mut skills = Vec::new();
     
     if skills_dir.exists() && skills_dir.is_dir() {
@@ -308,22 +354,30 @@ pub async fn get_available_skills(vault_path: String) -> Result<Vec<SkillInfo>, 
                         if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
                             let mut description = "No description available.".to_string();
                             let mut name = dir_name.to_string();
+                            let mut is_valid_skill = false;
                             
                             if let Ok(content) = std::fs::read_to_string(&skill_md) {
-                                let lines: Vec<&str> = content.lines().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-                                if let Some(title_line) = lines.iter().find(|l| l.starts_with("# ")) {
-                                    name = title_line[2..].trim().to_string();
-                                }
-                                if let Some(desc_line) = lines.iter().find(|l| !l.starts_with('#')) {
-                                    description = desc_line.to_string();
+                                // Extract frontmatter
+                                if content.starts_with("---") {
+                                    let parts: Vec<&str> = content.split("---").collect();
+                                    if parts.len() >= 3 {
+                                        let fm_content = parts[1];
+                                        if let Ok(fm) = serde_yaml::from_str::<SkillFrontmatter>(fm_content) {
+                                            name = fm.name;
+                                            description = fm.description.unwrap_or_else(|| "No description available.".to_string());
+                                            is_valid_skill = true;
+                                        }
+                                    }
                                 }
                             }
                             
-                            skills.push(SkillInfo {
-                                id: format!(".agents/skills/{}", dir_name),
-                                name,
-                                description,
-                            });
+                            if is_valid_skill {
+                                skills.push(SkillInfo {
+                                    id: format!("agents/skills/{}", dir_name),
+                                    name,
+                                    description,
+                                });
+                            }
                         }
                     }
                 }
@@ -333,6 +387,38 @@ pub async fn get_available_skills(vault_path: String) -> Result<Vec<SkillInfo>, 
     
     skills.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(skills)
+}
+
+#[tauri::command]
+pub async fn save_skill(vault_path: String, skill_id: String, content: String) -> Result<(), String> {
+    let skill_dir_name = skill_id.strip_prefix("agents/skills/").unwrap_or(&skill_id);
+    let skill_dir = std::path::Path::new(&vault_path)
+        .join(".glade")
+        .join("agents")
+        .join("skills")
+        .join(skill_dir_name);
+        
+    std::fs::create_dir_all(&skill_dir).map_err(|e| format!("Failed to create skill directory: {}", e))?;
+    
+    let skill_md = skill_dir.join("SKILL.md");
+    std::fs::write(&skill_md, content).map_err(|e| format!("Failed to write SKILL.md: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_skill(vault_path: String, skill_id: String) -> Result<(), String> {
+    let skill_dir_name = skill_id.strip_prefix("agents/skills/").unwrap_or(&skill_id);
+    let skill_dir = std::path::Path::new(&vault_path)
+        .join(".glade")
+        .join("agents")
+        .join("skills")
+        .join(skill_dir_name);
+        
+    if skill_dir.exists() {
+        std::fs::remove_dir_all(&skill_dir).map_err(|e| format!("Failed to delete skill directory: {}", e))?;
+    }
+    Ok(())
 }
 
 pub async fn execute_agent(
@@ -448,10 +534,22 @@ pub async fn execute_agent(
                 let _ = tx.send(TraceEvent::ToolRequested { name: fc.name.clone(), args: fc.args.clone() });
             }
 
-            let requires_approval = match fc.name.as_str() {
+            let mut requires_approval = match fc.name.as_str() {
                 "run_command" | "write_file" => true,
                 _ => false,
             };
+
+            let require_approval_override = agent.tools_requiring_approval.as_ref().map_or(false, |reqs| reqs.contains(&fc.name));
+
+            if requires_approval {
+                let explicitly_allowed = agent.tools_allowed.as_ref().map_or(false, |tools| tools.contains(&fc.name));
+                
+                if explicitly_allowed && !require_approval_override {
+                    requires_approval = false;
+                }
+            } else if require_approval_override {
+                requires_approval = true;
+            }
 
             let mut approved = true;
             if requires_approval {
@@ -511,6 +609,7 @@ async fn prepare_agent_execution(
     agent: &Agent,
     vault_path: Option<String>,
     app_handle: tauri::AppHandle,
+    messages: Option<&[ChatMessage]>,
 ) -> Result<(String, String, HashMap<String, Box<dyn tools::ToolExecutor>>, Agent), String> {
     let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
     
@@ -537,32 +636,69 @@ async fn prepare_agent_execution(
         if allowed.contains(&"read_file".to_string()) {
             executors.insert(
                 "read_file".to_string(), 
-                Box::new(tools::ReadFileTool { vault_path: path.clone() })
+                Box::new(tools::ReadFileTool { 
+                    vault_path: path.clone(),
+                    allowed_zones: agent.allowed_zones.clone(),
+                })
             );
         }
         if allowed.contains(&"write_file".to_string()) {
             executors.insert(
                 "write_file".to_string(), 
-                Box::new(tools::WriteFileTool { vault_path: path.clone() })
+                Box::new(tools::WriteFileTool { 
+                    vault_path: path.clone(),
+                    allowed_zones: agent.allowed_zones.clone(),
+                })
             );
         }
         if allowed.contains(&"list_directory".to_string()) {
             executors.insert(
                 "list_directory".to_string(), 
-                Box::new(tools::ListDirectoryTool { vault_path: path.clone() })
+                Box::new(tools::ListDirectoryTool { 
+                    vault_path: path.clone(),
+                    allowed_zones: agent.allowed_zones.clone(),
+                })
             );
         }
         if allowed.contains(&"search_files".to_string()) {
             executors.insert(
                 "search_files".to_string(), 
-                Box::new(tools::SearchFilesTool { vault_path: path.clone() })
+                Box::new(tools::SearchFilesTool { 
+                    vault_path: path.clone(),
+                    allowed_zones: agent.allowed_zones.clone(),
+                })
             );
         }
         if allowed.contains(&"run_command".to_string()) {
             executors.insert(
                 "run_command".to_string(), 
-                Box::new(tools::RunCommandTool { vault_path: path.clone() })
+                Box::new(tools::RunCommandTool { 
+                    vault_path: path.clone(),
+                    allowed_zones: agent.allowed_zones.clone(),
+                })
             );
+        }
+        if allowed.contains(&"agent_log".to_string()) {
+            executors.insert(
+                "agent_log".to_string(), 
+                Box::new(tools::AgentLogTool { 
+                    vault_path: path.clone(),
+                    agent_id: agent.id.clone(),
+                })
+            );
+        }
+        if allowed.contains(&"semantic_search".to_string()) {
+            let manager = app_handle.state::<crate::vector_db::VectorDbManager>();
+            if let Ok(db_arc) = manager.get_or_create(&path).await {
+                executors.insert(
+                    "semantic_search".to_string(), 
+                    Box::new(tools::SemanticSearchTool { 
+                        vault_path: path.clone(),
+                        allowed_zones: agent.allowed_zones.clone(),
+                        db: db_arc,
+                    })
+                );
+            }
         }
         
         let mcp_manager = app_handle.state::<crate::mcp::McpManager>();
@@ -580,7 +716,11 @@ async fn prepare_agent_execution(
             let mut function_declarations = Vec::new();
             
             for (composite_name, (server_name, mcp_tool)) in all_tools {
-                if agent.tools_allowed.as_ref().map(|t| t.contains(&composite_name)).unwrap_or(false) {
+                let is_allowed = agent.tools_allowed.as_ref().map(|t| {
+                    t.contains(&composite_name) || t.contains(&server_name)
+                }).unwrap_or(false);
+
+                if is_allowed {
                     if let Some(client) = mcp_manager.get_client(&server_name).await {
                         executors.insert(
                             composite_name.clone(),
@@ -652,6 +792,35 @@ async fn prepare_agent_execution(
                                         let rel_path = entry.path().strip_prefix(std::path::Path::new(path)).unwrap_or(entry.path()).to_string_lossy().to_string();
                                         combined_system_prompt.push_str(&format!("\n\n--- MEMORY ({}) ---\n", rel_path));
                                         combined_system_prompt.push_str(&content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Inject semantic search results
+        if let Some(msgs) = messages {
+            if let Some(last_user_msg) = msgs.iter().rev().find(|m| m.role == "user") {
+                if let Some(vp) = &vault_path {
+                    let vault_path_clone = vp.clone();
+                    let query = last_user_msg.content.clone();
+                    
+                    let manager = app_handle.state::<crate::vector_db::VectorDbManager>();
+                    if let Ok(db_arc) = manager.get_or_create(&vault_path_clone).await {
+                        let search_res = tauri::async_runtime::spawn_blocking(move || {
+                            let mut db = db_arc.blocking_write();
+                            db.search(&query, 5) // Limit 5 chunks
+                        }).await;
+                        
+                        if let Ok(Ok(results)) = search_res {
+                            if !results.is_empty() {
+                                combined_system_prompt.push_str("\n\n--- RELEVANT CONTEXT (Semantic Search) ---\n");
+                                for res in results {
+                                    if let (Some(fp), Some(content)) = (res.get("file_path").and_then(|v| v.as_str()), res.get("content").and_then(|v| v.as_str())) {
+                                        combined_system_prompt.push_str(&format!("\nFile: {}\nContent:\n{}\n", fp, content));
                                     }
                                 }
                             }
@@ -770,7 +939,7 @@ pub async fn invoke_agent(
     vault_path: Option<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle.clone()).await?;
+    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle.clone(), Some(&messages)).await?;
     
     let augmented_context = if let Some(ref vp) = vault_path {
         format!("Vault Absolute Path: {}\n{}", vp, context)
@@ -1039,6 +1208,57 @@ pub async fn generate_agent_persona_inner(
     Ok(new_agent)
 }
 
+pub async fn generate_skill_inner(
+    prompt: &str,
+    _vault_path: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<String, String> {
+    let system_instruction = gemini::SystemInstruction {
+        parts: vec![gemini::Part::Text(
+            "You are an expert AI skill developer for an agent framework. The user will describe a skill they want to build. You must output the complete file content for this skill. The output MUST conform exactly to the agentskills.io standard, which is a Markdown file starting with YAML frontmatter.
+            
+The structure MUST be:
+---
+name: \"Human Readable Skill Name\"
+description: \"A short, one-sentence description of what the skill does.\"
+---
+
+# Instructions
+[Detailed markdown instructions on how the agent should execute this skill. Provide clear steps, tool usage advice, and expected outcomes.]
+".to_string()
+        )],
+    };
+
+    let request = gemini::GeminiRequest {
+        contents: vec![gemini::Content {
+            role: "user".to_string(),
+            parts: vec![gemini::Part::Text(prompt.to_string())],
+        }],
+        system_instruction: Some(system_instruction),
+        tools: None,
+    };
+
+    let response = gemini::call_gemini(api_key, model, &request, None).await.map_err(|e| e.to_string())?;
+
+    let output_text = response.candidates
+        .and_then(|mut c| c.pop())
+        .and_then(|c| c.content)
+        .and_then(|mut content| content.parts.take())
+        .and_then(|mut parts| parts.pop())
+        .and_then(|p| p.text)
+        .unwrap_or_default();
+
+    let cleaned_text = output_text.trim()
+        .trim_start_matches("```markdown")
+        .trim_start_matches("```md")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+
+    Ok(cleaned_text.to_string())
+}
+
 pub async fn invoke_agent_stream(
     agent: Agent,
     messages: Vec<ChatMessage>,
@@ -1046,7 +1266,7 @@ pub async fn invoke_agent_stream(
     vault_path: Option<String>,
     app_handle: tauri::AppHandle,
 ) -> Result<impl futures::stream::Stream<Item = Result<String, String>>, String> {
-    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle).await?;
+    let (api_key, model, executors, final_agent) = prepare_agent_execution(&agent, vault_path.clone(), app_handle, Some(&messages)).await?;
     
     let augmented_context = if let Some(ref vp) = vault_path {
         format!("Vault Absolute Path: {}\n{}", vp, context)
@@ -1095,4 +1315,64 @@ mod tests {
         let parsed = parse_agent_markdown("test".to_string(), &md).unwrap();
         println!("PARSED: {:?}", parsed);
     }
+}
+pub async fn generate_tool_inner(
+    prompt: &str,
+    _vault_path: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<String, String> {
+    let system_instruction = gemini::SystemInstruction {
+        parts: vec![gemini::Part::Text(
+            "You are an expert AI tool configuration generator. The user will describe an MCP (Model Context Protocol) server they want to use. You must output ONLY a valid JSON object containing the configuration for this MCP server. Do not include markdown codeblocks or any other text.
+If the user provides a GitHub repository (e.g., https://github.com/user/repo), you MUST use `github:user/repo` in the npx arguments instead of an npm package.
+            
+Example 1 (NPM Package):
+{
+  \"name\": \"postgres\",
+  \"command\": \"npx\",
+  \"args\": [\"-y\", \"@modelcontextprotocol/server-postgres\"],
+  \"env\": {
+    \"POSTGRES_URL\": \"postgresql://localhost/mydb\"
+  }
+}
+
+Example 2 (Github Repository):
+{
+  \"name\": \"workspace\",
+  \"command\": \"npx\",
+  \"args\": [\"-y\", \"github:gemini-cli-extensions/workspace\"],
+  \"env\": {}
+}
+".to_string()
+        )],
+    };
+
+    let request = gemini::GeminiRequest {
+        contents: vec![gemini::Content {
+            role: "user".to_string(),
+            parts: vec![gemini::Part::Text(prompt.to_string())],
+        }],
+        system_instruction: Some(system_instruction),
+        tools: None,
+    };
+
+    let response = gemini::call_gemini(api_key, model, &request, None).await.map_err(|e| e.to_string())?;
+
+    let output_text = response.candidates
+        .and_then(|mut c| c.pop())
+        .and_then(|c| c.content)
+        .and_then(|mut content| content.parts.take())
+        .and_then(|mut parts| parts.pop())
+        .and_then(|p| p.text)
+        .unwrap_or_default();
+
+    let cleaned_text = output_text.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+        .to_string();
+
+    Ok(cleaned_text)
 }

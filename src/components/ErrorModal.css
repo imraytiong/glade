@@ -13,8 +13,8 @@
 }
 
 .error-modal-content {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color, #333);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border, #333);
   border-radius: 8px;
   padding: 24px;
   width: 100%;
@@ -32,7 +32,7 @@
 .error-modal-message {
   margin-bottom: 16px;
   line-height: 1.5;
-  color: var(--text-primary);
+  color: var(--text-normal);
 }
 
 .error-modal-details-container {
@@ -42,7 +42,7 @@
 .error-modal-details-btn {
   background: none;
   border: none;
-  color: var(--text-accent);
+  color: var(--interactive-accent);
   cursor: pointer;
   padding: 0;
   font-size: 0.875rem;
@@ -51,8 +51,8 @@
 
 .error-modal-details-content {
   margin-top: 12px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color, #333);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border, #333);
   border-radius: 4px;
   padding: 12px;
   font-size: 0.75rem;

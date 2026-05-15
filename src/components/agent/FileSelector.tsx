@@ -2,29 +2,39 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, FolderOpen, X, Check, FileText } from 'lucide-react';
 import { readVaultRecursive, flattenNodes, FileNode } from '../../utils/fs';
 
-interface FileSelectorProps {
-  vaultPath: string;
-  selectedFiles: string[];
-  onAddFiles: (paths: string[]) => void;
-}
-
-export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: FileSelectorProps) {
-  const [allFiles, setAllFiles] = useState<FileNode[]>([]);
+export default function FileSelector({ 
+  vaultPath, 
+  selectedFiles, 
+  onChange,
+  directoriesOnly = false
+}: { 
+  vaultPath: string; 
+  selectedFiles: string[]; 
+  onChange: (paths: string[]) => void;
+  directoriesOnly?: boolean;
+}) {
   const [query, setQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [allFiles, setAllFiles] = useState<FileNode[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadFiles = async () => {
-      const nodes = await readVaultRecursive(vaultPath);
-      const flat = flattenNodes(nodes);
-      // Ensure paths are relative to vaultPath for the context bank
-      const relativeFiles = flat.map(f => ({
-        ...f,
-        path: f.path.replace(vaultPath + '/', '')
-      }));
-      setAllFiles(relativeFiles);
+      try {
+        const nodes = await readVaultRecursive(vaultPath);
+        let flat = flattenNodes(nodes);
+        if (directoriesOnly) {
+          flat = flat.filter(f => f.isDirectory);
+        }
+        const relativeFiles = flat.map(f => ({
+          ...f,
+          path: f.path.replace(vaultPath + '/', '')
+        }));
+        setAllFiles(relativeFiles);
+      } catch (err) {
+        console.error("Failed to load files", err);
+      }
     };
     if (vaultPath) {
       loadFiles();
@@ -44,11 +54,11 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
   const filteredFiles = allFiles.filter(f => 
     f.path.toLowerCase().includes(query.toLowerCase()) && 
     !selectedFiles.includes(f.path)
-  ).slice(0, 10); // Limit to 10 for dropdown
+  ).slice(0, 10);
 
   const handleAddFile = (path: string) => {
     if (!selectedFiles.includes(path)) {
-      onAddFiles([path]);
+      onChange([...selectedFiles, path]);
       setQuery('');
       setIsDropdownOpen(false);
     }
@@ -84,7 +94,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
               }
             }}
           />
-          {isDropdownOpen && query && filteredFiles.length > 0 && (
+          {isDropdownOpen && query && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -99,7 +109,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
               maxHeight: '200px',
               overflowY: 'auto'
             }}>
-              {filteredFiles.map(f => (
+              {filteredFiles.length > 0 ? filteredFiles.map(f => (
                 <div
                   key={f.path}
                   onClick={() => handleAddFile(f.path)}
@@ -118,7 +128,9 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
                   {f.isDirectory ? <FolderOpen size={14} color="var(--text-muted)" /> : <FileText size={14} color="var(--text-muted)" />}
                   {f.path}
                 </div>
-              ))}
+              )) : (
+                <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: '13px' }}>No files found</div>
+              )}
             </div>
           )}
         </div>
@@ -141,7 +153,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1000
-        }}>
+        }} onClick={() => setIsModalOpen(false)}>
           <div style={{
             background: 'var(--background-primary)',
             borderRadius: '8px',
@@ -151,7 +163,7 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
-          }}>
+          }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '16px', borderBottom: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0 }}>Select Files for Context Bank</h3>
               <button className="btn-icon" onClick={() => setIsModalOpen(false)}>
@@ -160,39 +172,48 @@ export default function FileSelector({ vaultPath, selectedFiles, onAddFiles }: F
             </div>
             
             <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '8px' }}>
-                {allFiles.map(f => {
-                  const isSelected = selectedFiles.includes(f.path);
-                  return (
-                    <div
-                      key={f.path}
-                      onClick={() => {
-                        if (!isSelected) {
-                           onAddFiles([f.path]);
-                        }
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        background: isSelected ? 'var(--interactive-accent)' : 'var(--background-secondary)',
-                        color: isSelected ? 'white' : 'var(--text-normal)',
-                        borderRadius: '6px',
-                        cursor: isSelected ? 'default' : 'pointer',
-                        fontSize: '13px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        border: '1px solid var(--background-modifier-border)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                        {f.isDirectory ? <FolderOpen size={14} color={isSelected ? 'white' : 'var(--text-muted)'} /> : <FileText size={14} color={isSelected ? 'white' : 'var(--text-muted)'} />}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</span>
+              {allFiles.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                  No files or folders found.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '8px' }}>
+                  {allFiles.map(f => {
+                    const isSelected = selectedFiles.includes(f.path);
+                    return (
+                      <div
+                        key={f.path}
+                        onClick={() => {
+                          if (isSelected) {
+                            onChange(selectedFiles.filter(p => p !== f.path));
+                          } else {
+                            onChange([...selectedFiles, f.path]);
+                          }
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          background: isSelected ? 'var(--interactive-accent)' : 'var(--background-secondary)',
+                          color: isSelected ? 'white' : 'var(--text-normal)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          border: '1px solid var(--background-modifier-border)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                          {f.isDirectory ? <FolderOpen size={14} color={isSelected ? 'white' : 'var(--text-muted)'} /> : <FileText size={14} color={isSelected ? 'white' : 'var(--text-muted)'} />}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.path}</span>
+                        </div>
+                        {isSelected && <Check size={14} />}
                       </div>
-                      {isSelected && <Check size={14} />}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div style={{ padding: '16px', borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end' }}>

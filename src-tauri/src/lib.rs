@@ -2,6 +2,7 @@ mod agent;
 mod gemini;
 pub mod mcp;
 pub mod server;
+pub mod vector_db;
 
 use walkdir::WalkDir;
 use tauri::{Manager, Emitter};
@@ -100,6 +101,22 @@ async fn build_agent(prompt: String, vault_path: String, app_handle: tauri::AppH
 }
 
 #[tauri::command]
+async fn build_skill(prompt: String, vault_path: String, app_handle: tauri::AppHandle) -> Result<String, String> {
+    let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
+    let _ = stores.reload();
+    
+    let api_key_val = stores.get("gemini_api_key").ok_or("Gemini API Key not set in Settings")?;
+    let api_key = api_key_val.as_str().ok_or("Invalid API Key format")?;
+    
+    // Default to reasoning model, fallback to general if not set
+    let model = stores.get("model_reasoning").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-2.5-pro".to_string());
+    
+    let skill_md = agent::generate_skill_inner(&prompt, &vault_path, api_key, &model).await?;
+    
+    Ok(skill_md)
+}
+
+#[tauri::command]
 async fn approve_agent_action(id: String, approved: bool, app_handle: tauri::AppHandle) -> Result<(), String> {
     let pending = app_handle.try_state::<PendingApprovalsState>().ok_or("No pending approvals state")?;
     let mut map = pending.0.lock().await;
@@ -109,6 +126,53 @@ async fn approve_agent_action(id: String, approved: bool, app_handle: tauri::App
     } else {
         Err("Approval ID not found or already processed".to_string())
     }
+}
+
+#[tauri::command]
+async fn build_index(vault_path: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let manager = app_handle.state::<vector_db::VectorDbManager>();
+    let db_arc = manager.get_or_create(&vault_path).await?;
+    
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut db = db_arc.blocking_write();
+        db.build_index()
+    }).await.map_err(|e| format!("Join error: {}", e))?
+}
+
+#[tauri::command]
+async fn build_tool(prompt: String, vault_path: String, app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_store::StoreExt;
+    let stores = app_handle.store("settings.json").map_err(|e| format!("Failed to access store: {}", e))?;
+    let _ = stores.reload();
+    
+    let api_key_val = stores.get("gemini_api_key").ok_or("Gemini API Key not set in Settings")?;
+    let api_key = api_key_val.as_str().ok_or("Invalid API Key format")?;
+    
+    // Default to reasoning model, fallback to general if not set
+    let model = stores.get("model_reasoning").and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_else(|| "gemini-2.5-pro".to_string());
+    
+    let tool_json = agent::generate_tool_inner(&prompt, &vault_path, api_key, &model).await?;
+    
+    Ok(tool_json)
+}
+
+#[tauri::command]
+async fn ping_mcp_server(command: String, args: Vec<String>, env: std::collections::HashMap<String, String>, app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let spawn_future = mcp::client::McpClient::spawn(&command, &args, &env, Some(app_handle));
+    let client = tokio::time::timeout(std::time::Duration::from_secs(30), spawn_future)
+        .await
+        .map_err(|_| "Timeout waiting for MCP server to start. The server might be downloading dependencies or waiting for user input.")?
+        .map_err(|e| e)?;
+        
+    let tools_future = client.list_tools();
+    let tools = tokio::time::timeout(std::time::Duration::from_secs(10), tools_future)
+        .await
+        .map_err(|_| "Timeout waiting for list_tools response")?
+        .map_err(|e| e)?;
+    
+    Ok(serde_json::json!({
+        "tools": tools.tools
+    }))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -125,6 +189,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .manage(mcp::McpManager::new())
+        .manage(vector_db::VectorDbManager::new())
         .manage(PendingApprovalsState(Arc::new(Mutex::new(HashMap::new()))))
         .setup(|app| {
             let is_headless = std::env::args().any(|arg| arg == "--headless");
@@ -155,9 +220,20 @@ pub fn run() {
                 agent::delete_agent,
                 agent::get_available_tools,
                 agent::get_available_skills,
+                agent::save_skill,
+                agent::delete_skill,
+                agent::get_agent_logs,
                 open_agent_window,
                 build_agent,
-                approve_agent_action
+                build_skill,
+                approve_agent_action,
+                build_index,
+                build_tool,
+                ping_mcp_server,
+                agent::load_thread,
+                agent::invoke_agent,
+                agent::append_message_to_thread,
+                agent::clear_thread,
             ])
             .build(tauri::generate_context!())
             .expect("error while running tauri application");

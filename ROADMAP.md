@@ -33,7 +33,7 @@ Our focus for Alpha 5 is to elevate agents into first-class citizens with a dedi
 - **Autonomous Approvals & Observability:** Strict human-in-the-loop approval queues for autonomous runs and real-time execution tracing.
 - **Ecosystem Management UI:** Visual dashboards for MCP setup, Custom Local Tool creation, and Skills Definition.
 
-## 🚧 Current Milestone: Alpha 6 (Intelligent Storage & Routines)
+## ✅ Completed Milestone: Alpha 6 (Intelligent Storage & Routines)
 - **Context Banks & Memory:** Curated context selection for agents to use memory beyond raw file injection.
 - **Semantic Vector Search:** Deep semantic search across the vault powered by a lightweight local vector database (like ChromaDB or Qdrant).
 - **File System "Zones" (RBAC):** Restricting agent access to specific vault directories for security.
@@ -42,7 +42,7 @@ Our focus for Alpha 5 is to elevate agents into first-class citizens with a dedi
 - **Ecosystem Extensibility:** Improved custom tool and MCP setting support, with the ability to dynamically install, create, and customize Skills.
 - **Advanced Traceability & Debugging:** Enhanced telemetry and observability panels for deep debugging of agent actions and orchestration loops.
 
-## 🔭 Upcoming Milestone: Alpha 7 (The Inter-Connected Ecosystem)
+## 🚧 Current Milestone: Alpha 7 (The Inter-Connected Ecosystem)
 - **Inter-Connected Vaults:** The capability to seamlessly connect separate Glade vaults, allowing agents to query and cross-reference information securely across a defined "Collection" boundary. *(See [INTERCONNECTED_VAULTS_RESEARCH.md](./INTERCONNECTED_VAULTS_RESEARCH.md) for approved architectural blueprints and security boundaries)*.
 - **Automated Routines & Routing:** Visually defining complex multi-agent workflows and event-triggered routines.
 - **Background Agent Execution:** Support for dispatching agents to run long-lived background tasks independently of the active UI session.

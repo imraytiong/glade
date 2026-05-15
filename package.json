@@ -17,7 +17,8 @@
     "start:headless": "cargo run --manifest-path src-tauri/Cargo.toml -- --headless"
   },
   "dependencies": {
-    "@hello-pangea/dnd": "^18.0.1",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@milkdown/core": "^7.21.0",
     "@milkdown/ctx": "^7.21.0",
     "@milkdown/plugin-block": "^7.21.0",

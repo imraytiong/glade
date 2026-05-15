@@ -21,19 +21,33 @@ enum ClientMessage {
 }
 
 impl McpClient {
-    pub async fn spawn(command: &str, args: &[String], env: &HashMap<String, String>) -> Result<Self, String> {
+    pub async fn spawn(command: &str, args: &[String], env: &HashMap<String, String>, app_handle: Option<tauri::AppHandle>) -> Result<Self, String> {
         let mut child = Command::new(command)
             .args(args)
             .envs(env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| format!("Failed to spawn MCP server: {}", e))?;
 
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
+        let stderr = child.stderr.take().ok_or("Failed to open stderr")?;
+
+        if let Some(app) = app_handle {
+            use tauri::Emitter;
+            tokio::spawn(async move {
+                let mut reader = BufReader::new(stderr);
+                let mut line = String::new();
+                while let Ok(bytes) = reader.read_line(&mut line).await {
+                    if bytes == 0 { break; }
+                    let _ = app.emit("mcp-log", line.trim().to_string());
+                    line.clear();
+                }
+            });
+        }
 
         let (request_tx, mut request_rx) = mpsc::channel::<ClientMessage>(32);
         
@@ -82,6 +96,11 @@ impl McpClient {
                     tracing::debug!("Received unhandled request from MCP server: {:?}", req.method);
                 }
                 line.clear();
+            }
+
+            let mut pending = pending_requests_clone.lock().await;
+            for (_, tx) in pending.drain() {
+                let _ = tx.send(Err("MCP server process exited unexpectedly".to_string()));
             }
         });
 

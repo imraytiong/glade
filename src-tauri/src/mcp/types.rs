@@ -6,6 +6,7 @@ pub struct JsonRpcRequest {
     pub jsonrpc: String,
     pub id: u64,
     pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Value>,
 }
 

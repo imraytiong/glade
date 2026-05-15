@@ -51,7 +51,7 @@ impl McpManager {
                 
                 tracing::info!("Starting MCP server '{}': {} {:?}", name, server_config.command, args);
                 
-                match McpClient::spawn(&server_config.command, &args, &env).await {
+                match McpClient::spawn(&server_config.command, &args, &env, None).await {
                     Ok(client) => {
                         new_clients.insert(name, Arc::new(client));
                     }
@@ -84,8 +84,8 @@ impl McpManager {
             match client.list_tools().await {
                 Ok(res) => {
                     for tool in res.tools {
-                        // Create a composite name to avoid collisions
-                        let composite_name = format!("{}::{}", server_name, tool.name);
+                        // Create a composite name to avoid collisions. Use underscore instead of colon for Gemini API compatibility.
+                        let composite_name = format!("{}_{}", server_name, tool.name);
                         all_tools.insert(composite_name, (server_name.clone(), tool));
                     }
                 }

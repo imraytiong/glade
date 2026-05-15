@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   readTextFile,
@@ -27,7 +26,7 @@ import { Command } from "./utils/commands";
 import { useSettings } from "./utils/settings";
 
 import AgentSidebar, { Message } from "./components/layout/AgentSidebar";
-import AgentWorkspace from "./components/agent/AgentWorkspace";
+import AgentView from "./components/agent/AgentView";
 import Editor, { EditorHandle } from "./components/Editor";
 import TabBar from "./components/TabBar";
 import StatusBar from "./components/StatusBar";
@@ -37,10 +36,10 @@ import BacklinksPane from "./components/BacklinksPane";
 import SettingsDialog from "./components/SettingsDialog";
 import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
 import Sidebar from "./components/layout/Sidebar";
-import ModelsPanel from "./components/ecosystem/ModelsPanel";
-import ToolsPanel from "./components/ecosystem/ToolsPanel";
-import SkillsPanel from "./components/ecosystem/SkillsPanel";
-import TracePanel from "./components/agent/TracePanel";
+import ModelsView from "./components/ecosystem/ModelsView";
+import ToolsView from "./components/ecosystem/ToolsView";
+import SkillsView from "./components/ecosystem/SkillsView";
+import TraceView from "./components/agent/TraceView";
 import "./App.css";
 
 function extractFrontmatter(content: string) {
@@ -251,6 +250,7 @@ function App() {
     readingTime: number;
   } | null>(null);
   const [agentMessages, setAgentMessages] = useState<Message[]>([]);
+  const [activeAgentChatId, setActiveAgentChatId] = useState<string>("coordinator");
 
   // Load File Content when active tab changes
   useEffect(() => {
@@ -941,189 +941,183 @@ function App() {
               />
             </div>
 
-          <DragDropContext
-            onDragEnd={(result) => {
-              if (!result.destination) return;
-              const newOrder = Array.from(ribbonConfig.order);
-              const [reorderedItem] = newOrder.splice(result.source.index, 1);
-              newOrder.splice(result.destination.index, 0, reorderedItem);
-              setRibbonConfig((prev) => ({ ...prev, order: newOrder }));
-            }}
-          >
-            <Droppable droppableId="ribbon-droppable">
-              {(provided) => (
+                    <div className="ribbon-top">
+            {ribbonConfig.order.map((id, index) => {
+              if (ribbonConfig.hidden.includes(id)) return null;
+
+              if (id === "divider") {
+                return (
+                  <div
+                    key={id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/glade-ribbon", index.toString());
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const sourceIndex = parseInt(e.dataTransfer.getData("application/glade-ribbon"));
+                      if (isNaN(sourceIndex) || sourceIndex === index) return;
+                      const newOrder = Array.from(ribbonConfig.order);
+                      const [reorderedItem] = newOrder.splice(sourceIndex, 1);
+                      newOrder.splice(index, 0, reorderedItem);
+                      setRibbonConfig((prev) => ({ ...prev, order: newOrder }));
+                    }}
+                    style={{
+                      width: "60%",
+                      height: "1px",
+                      backgroundColor: "var(--background-modifier-border)",
+                      margin: "8px 0",
+                      cursor: "grab",
+                    }}
+                  />
+                );
+              }
+
+              let icon, onClick, title, isActive;
+              switch (id) {
+                case "files":
+                  icon = <Files size={20} />;
+                  onClick = () => {
+                    setCurrentView("editor");
+                    if (sidebarView === "explorer" && isSidebarOpen)
+                      setIsSidebarOpen(false);
+                    else {
+                      setSidebarView("explorer");
+                      setIsSidebarOpen(true);
+                    }
+                  };
+                  title = "Files";
+                  isActive =
+                    currentView === "editor" &&
+                    sidebarView === "explorer" &&
+                    isSidebarOpen;
+                  break;
+                case "outline":
+                  icon = <List size={20} />;
+                  onClick = () => {
+                    setCurrentView("editor");
+                    if (sidebarView === "outline" && isSidebarOpen)
+                      setIsSidebarOpen(false);
+                    else {
+                      setSidebarView("outline");
+                      setIsSidebarOpen(true);
+                    }
+                  };
+                  title = "Outline";
+                  isActive =
+                    currentView === "editor" &&
+                    sidebarView === "outline" &&
+                    isSidebarOpen;
+                  break;
+                case "agent-chat":
+                  icon = <MessageSquare size={20} />;
+                  onClick = () => {
+                    if (currentView !== "editor") {
+                      setCurrentView("editor");
+                      if (!isAgentSidebarOpen) setIsAgentSidebarOpen(true);
+                    } else {
+                      setIsAgentSidebarOpen((prev) => !prev);
+                    }
+                  };
+                  title = "Agent Chat";
+                  isActive = isAgentSidebarOpen;
+                  break;
+                case "agent-workspace":
+                  icon = <Bot size={20} />;
+                  onClick = () => {
+                    setCurrentView("agent");
+                    setIsSidebarOpen(false);
+                    setIsAgentSidebarOpen(false);
+                  };
+                  title = "Fleet Builder";
+                  isActive = currentView === "agent";
+                  break;
+                case "models":
+                  icon = <Brain size={20} />;
+                  onClick = () => {
+                    setCurrentView("models");
+                    setIsSidebarOpen(false);
+                    setIsAgentSidebarOpen(false);
+                  };
+                  title = "AI Models";
+                  isActive = currentView === "models";
+                  break;
+                case "tools":
+                  icon = <Wrench size={20} />;
+                  onClick = () => {
+                    setCurrentView("tools");
+                    setIsSidebarOpen(false);
+                    setIsAgentSidebarOpen(false);
+                  };
+                  title = "MCP Tools";
+                  isActive = currentView === "tools";
+                  break;
+                case "skills":
+                  icon = <Zap size={20} />;
+                  onClick = () => {
+                    setCurrentView("skills");
+                    setIsSidebarOpen(false);
+                    setIsAgentSidebarOpen(false);
+                  };
+                  title = "Agent Skills";
+                  isActive = currentView === "skills";
+                  break;
+                case "traces":
+                  icon = <Activity size={20} />;
+                  onClick = () => {
+                    setCurrentView("traces");
+                    setIsSidebarOpen(false);
+                    setIsAgentSidebarOpen(false);
+                  };
+                  title = "Activity Traces";
+                  isActive = currentView === "traces";
+                  break;
+                default:
+                  return null;
+              }
+
+              return (
                 <div
-                  className="ribbon-top"
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
+                  key={id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/glade-ribbon", index.toString());
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const sourceIndex = parseInt(e.dataTransfer.getData("application/glade-ribbon"));
+                    if (isNaN(sourceIndex) || sourceIndex === index) return;
+                    const newOrder = Array.from(ribbonConfig.order);
+                    const [reorderedItem] = newOrder.splice(sourceIndex, 1);
+                    newOrder.splice(index, 0, reorderedItem);
+                    setRibbonConfig((prev) => ({ ...prev, order: newOrder }));
+                  }}
+                  style={{
+                    cursor: "grab",
+                    display: "flex",
+                    justifyContent: "center",
+                    width: "100%",
+                  }}
                 >
-                  {ribbonConfig.order.map((id, index) => {
-                    if (ribbonConfig.hidden.includes(id)) return null;
-
-                    return (
-                      <Draggable key={id} draggableId={id} index={index}>
-                        {(provided, snapshot) => {
-                          if (id === "divider") {
-                            return (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                style={{
-                                  width: "60%",
-                                  height: "1px",
-                                  backgroundColor:
-                                    "var(--background-modifier-border)",
-                                  margin: "8px 0",
-                                  cursor: "grab",
-                                  ...provided.draggableProps.style,
-                                }}
-                              />
-                            );
-                          }
-
-                          let icon, onClick, title, isActive;
-                          switch (id) {
-                            case "files":
-                              icon = <Files size={20} />;
-                              onClick = () => {
-                                setCurrentView("editor");
-                                if (sidebarView === "explorer" && isSidebarOpen)
-                                  setIsSidebarOpen(false);
-                                else {
-                                  setSidebarView("explorer");
-                                  setIsSidebarOpen(true);
-                                }
-                              };
-                              title = "Files";
-                              isActive =
-                                currentView === "editor" &&
-                                sidebarView === "explorer" &&
-                                isSidebarOpen;
-                              break;
-                            case "outline":
-                              icon = <List size={20} />;
-                              onClick = () => {
-                                setCurrentView("editor");
-                                if (sidebarView === "outline" && isSidebarOpen)
-                                  setIsSidebarOpen(false);
-                                else {
-                                  setSidebarView("outline");
-                                  setIsSidebarOpen(true);
-                                }
-                              };
-                              title = "Outline";
-                              isActive =
-                                currentView === "editor" &&
-                                sidebarView === "outline" &&
-                                isSidebarOpen;
-                              break;
-                            case "agent-chat":
-                              icon = <MessageSquare size={20} />;
-                              onClick = () => {
-                                if (currentView !== "editor") {
-                                  setCurrentView("editor");
-                                  if (!isAgentSidebarOpen)
-                                    setIsAgentSidebarOpen(true);
-                                } else {
-                                  setIsAgentSidebarOpen((prev) => !prev);
-                                }
-                              };
-                              title = "Agent Chat";
-                              isActive = isAgentSidebarOpen;
-                              break;
-                            case "agent-workspace":
-                              icon = <Bot size={20} />;
-                              onClick = () => {
-                                setCurrentView("agent");
-                                setIsSidebarOpen(false);
-                                setIsAgentSidebarOpen(false);
-                              };
-                              title = "Fleet Builder";
-                              isActive = currentView === "agent";
-                              break;
-                            case "models":
-                              icon = <Brain size={20} />;
-                              onClick = () => {
-                                setCurrentView("models");
-                                setIsSidebarOpen(false);
-                                setIsAgentSidebarOpen(false);
-                              };
-                              title = "AI Models";
-                              isActive = currentView === "models";
-                              break;
-                            case "tools":
-                              icon = <Wrench size={20} />;
-                              onClick = () => {
-                                setCurrentView("tools");
-                                setIsSidebarOpen(false);
-                                setIsAgentSidebarOpen(false);
-                              };
-                              title = "MCP Tools";
-                              isActive = currentView === "tools";
-                              break;
-                            case "skills":
-                              icon = <Zap size={20} />;
-                              onClick = () => {
-                                setCurrentView("skills");
-                                setIsSidebarOpen(false);
-                                setIsAgentSidebarOpen(false);
-                              };
-                              title = "Agent Skills";
-                              isActive = currentView === "skills";
-                              break;
-                            case "traces":
-                              icon = <Activity size={20} />;
-                              onClick = () => {
-                                setCurrentView("traces");
-                                setIsSidebarOpen(false);
-                                setIsAgentSidebarOpen(false);
-                              };
-                              title = "Activity Traces";
-                              isActive = currentView === "traces";
-                              break;
-                            default:
-                              return null;
-                          }
-
-                          return (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={{
-                                ...provided.draggableProps.style,
-                                cursor: snapshot.isDragging
-                                  ? "grabbing"
-                                  : "grab",
-                                display: "flex",
-                                justifyContent: "center",
-                                width: "100%",
-                              }}
-                            >
-                              <button
-                                className={`icon-btn ${isActive ? "active" : ""}`}
-                                onClick={onClick}
-                                title={title}
-                                style={{
-                                  pointerEvents: snapshot.isDragging
-                                    ? "none"
-                                    : "auto",
-                                }}
-                              >
-                                {icon}
-                              </button>
-                            </div>
-                          );
-                        }}
-                      </Draggable>
-                    );
-                  })}
-                  {provided.placeholder}
+                  <button
+                    className={`icon-btn ${isActive ? "active" : ""}`}
+                    onClick={onClick}
+                    title={title}
+                  >
+                    {icon}
+                  </button>
                 </div>
-              )}
-            </Droppable>
-          </DragDropContext>
+              );
+            })}
+          </div>
           </div>
           <div className="ribbon-bottom" style={{ gap: "4px" }}>
             <div
@@ -1229,7 +1223,7 @@ function App() {
               overflow: "hidden",
             }}
           >
-            <AgentWorkspace isActive={currentView === "agent"} />
+            <AgentView isActive={currentView === "agent"} />
           </div>
 
           {/* Models View */}
@@ -1241,7 +1235,7 @@ function App() {
               overflow: "hidden",
             }}
           >
-            <ModelsPanel />
+            <ModelsView />
           </div>
 
           {/* Tools View */}
@@ -1253,7 +1247,7 @@ function App() {
               overflow: "hidden",
             }}
           >
-            <ToolsPanel />
+            <ToolsView />
           </div>
 
           {/* Skills View */}
@@ -1265,7 +1259,7 @@ function App() {
               overflow: "hidden",
             }}
           >
-            <SkillsPanel />
+            <SkillsView />
           </div>
 
           {/* Traces View */}
@@ -1277,7 +1271,7 @@ function App() {
               overflow: "hidden",
             }}
           >
-            <TracePanel />
+            <TraceView />
           </div>
 
           {/* Editor View */}
@@ -1294,15 +1288,14 @@ function App() {
                 <h2>Welcome to Glade</h2>
                 <div
                   style={{
-                    background:
-                      "var(--bg-modifier-error, rgba(255, 0, 0, 0.1))",
-                    color: "var(--text-error, #ff4444)",
-                    padding: "12px",
-                    borderRadius: "8px",
+                    background: "var(--error-container)",
+                    color: "var(--on-error-container)",
+                    padding: "16px",
+                    borderRadius: "var(--radius-md)",
                     marginBottom: "24px",
                     maxWidth: "400px",
                     fontSize: "13px",
-                    border: "1px solid var(--text-error, #ff4444)",
+                    border: "1px solid var(--error)",
                   }}
                 >
                   <strong>Extreme Alpha Warning</strong>
@@ -1462,6 +1455,8 @@ function App() {
               vaultPath={vaultPath}
               messages={agentMessages}
               setMessages={setAgentMessages}
+              activeAgentChatId={activeAgentChatId}
+              setActiveAgentChatId={setActiveAgentChatId}
             />
           </div>
         </>
@@ -1480,6 +1475,7 @@ function App() {
       <SettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        vaultPath={vaultPath}
       />
       {fileToDelete && (
         <ConfirmDeleteModal
