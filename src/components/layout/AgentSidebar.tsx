@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { invoke } from '../../utils/api';
-import { listen } from '@tauri-apps/api/event';
+import { listen } from '../../utils/api';
 import { Send, Bot, User, Trash2 } from 'lucide-react';
 import { useError } from '../../contexts/ErrorContext';
 import ReactMarkdown from 'react-markdown';

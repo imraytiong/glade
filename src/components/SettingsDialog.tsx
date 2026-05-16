@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useSettings } from '../utils/settings';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../utils/api';
 
 interface SettingsDialogProps {
   isOpen: boolean;

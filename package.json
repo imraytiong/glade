@@ -1,7 +1,7 @@
 {
   "name": "glade",
   "private": true,
-  "version": "0.0.1-alpha.5",
+  "version": "0.0.1-alpha.6",
   "type": "module",
   "bin": {
     "glade": "./dist/cli/index.js"
@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "restart": "bash scripts/restart.sh",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "start:headless": "cargo run --manifest-path src-tauri/Cargo.toml -- --headless"
   },
@@ -58,6 +60,7 @@
     "react-markdown": "^10.1.0",
     "remark-frontmatter": "^4.0.1",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.34.5",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
@@ -65,12 +68,14 @@
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.8.0",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "^4.1.5",
+    "express": "^5.2.1",
     "jsdom": "^29.1.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",

@@ -1,7 +1,27 @@
 import * as tauriFs from '@tauri-apps/plugin-fs';
+import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from './api';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+export async function openDialog(options?: any): Promise<string | string[] | null> {
+  const tauriActive = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  if (tauriActive) {
+    try {
+      return await open(options);
+    } catch (err) {
+      console.warn("Tauri open dialog failed:", err);
+    }
+  }
+  
+  // Headless mode fallback (e2e testing)
+  // We can use a special window property that Playwright can override
+  if (typeof window !== 'undefined' && (window as any).__mockOpenDialogResult !== undefined) {
+    return (window as any).__mockOpenDialogResult;
+  }
+  
+  return null;
+}
 
 export async function readDir(path: string, options?: any): Promise<{name?: string, isDirectory: boolean, isFile: boolean, isSymlink: boolean}[]> {
   if (isTauri) return tauriFs.readDir(path, options);

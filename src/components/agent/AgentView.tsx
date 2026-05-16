@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke } from "../../utils/api";
+import { listen } from "../../utils/api";
 import GladeEditor from "../Editor";
 import FileSelector from "./FileSelector";
 
@@ -52,7 +52,11 @@ export default function AgentView({ isActive }: { isActive?: boolean }) {
     if (!vaultPath) return;
     try {
       const loadedAgents = await invoke<Agent[]>("get_agents", { vaultPath });
-      setAgents(loadedAgents);
+      if (loadedAgents && loadedAgents.length > 0) {
+        setAgents(loadedAgents);
+      } else {
+        setAgents([]);
+      }
 
       // If we have a selected agent, update its form data in case it changed externally
       if (selectedAgentId && selectedAgentId !== "new") {
@@ -190,7 +194,12 @@ export default function AgentView({ isActive }: { isActive?: boolean }) {
     setIsSaving(true);
     setError(null);
     try {
-      console.log("Saving agent:", formData);
+      console.log("=== handleSaveAgent ===");
+      console.log("formData keys:", Object.keys(formData));
+      console.log("formData.name:", formData.name);
+      console.log("formData.description:", formData.description);
+      console.log("formData.system_prompt:", formData.system_prompt);
+      console.log("Full agent:", formData);
       await invoke("save_agent", { vaultPath, agent: formData });
       if (selectedAgentId === "new") {
         setSelectedAgentId(formData.id);
@@ -394,6 +403,7 @@ export default function AgentView({ isActive }: { isActive?: boolean }) {
               {agents.map((agent) => (
                 <div
                   key={agent.id}
+                  className="sidebar-item"
                   onClick={() => selectAgent(agent.id)}
                   style={{
                     padding: "12px",

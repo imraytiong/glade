@@ -1,15 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/vault-fixture';
 
 test.describe('Glade UI Headless', () => {
-  test('should load the application and vault', async ({ page }) => {
+  test('should load the application and vault', async ({ page, dynamicVaultPath }) => {
     // Navigate to the app to initialize the origin
     await page.goto('/');
 
     // Set the vault path to the current working directory to bypass the native open dialog
-    const vaultPath = process.cwd();
     await page.evaluate((path) => {
       localStorage.setItem('glade_vaultPath', path);
-    }, vaultPath);
+    }, dynamicVaultPath);
 
     // Reload the page to trigger vault loading from local storage
     await page.reload();

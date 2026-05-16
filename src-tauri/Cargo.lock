@@ -2025,7 +2025,7 @@ dependencies = [
 
 [[package]]
 name = "glade"
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.6"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2047,6 +2047,7 @@ dependencies = [
  "tauri-plugin-http",
  "tauri-plugin-opener",
  "tauri-plugin-store",
+ "tempfile",
  "tokio",
  "tokio-stream",
  "tower-http 0.5.2",

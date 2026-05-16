@@ -360,3 +360,61 @@ impl ToolExecutor for SemanticSearchTool {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_read_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        fs::write(&file_path, "Hello, world!").unwrap();
+
+        let tool = ReadFileTool {
+            vault_path: dir.path().to_string_lossy().to_string(),
+            allowed_zones: None,
+        };
+        let args = json!({ "path": "test.txt" });
+        let result = tool.execute(args).await.unwrap();
+
+        assert_eq!(result["content"], "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_write_file() {
+        let dir = tempdir().unwrap();
+        
+        let tool = WriteFileTool {
+            vault_path: dir.path().to_string_lossy().to_string(),
+            allowed_zones: None,
+        };
+        let args = json!({ "path": "test_write.txt", "content": "File content" });
+        
+        let result = tool.execute(args).await.unwrap();
+        assert!(result["success"].as_bool().unwrap());
+
+        let content = fs::read_to_string(dir.path().join("test_write.txt")).unwrap();
+        assert_eq!(content, "File content");
+    }
+
+    #[tokio::test]
+    async fn test_list_directory() {
+        let dir = tempdir().unwrap();
+        fs::create_dir(dir.path().join("subdir")).unwrap();
+        fs::write(dir.path().join("file.txt"), "").unwrap();
+
+        let tool = ListDirectoryTool {
+            vault_path: dir.path().to_string_lossy().to_string(),
+            allowed_zones: None,
+        };
+        let args = json!({ "path": "." });
+        
+        let result = tool.execute(args).await.unwrap();
+        let files = result["entries"].as_array().unwrap();
+        assert_eq!(files.len(), 2);
+    }
+}

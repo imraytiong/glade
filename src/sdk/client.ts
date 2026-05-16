@@ -6,6 +6,7 @@ export interface Agent {
   toolsAllowed?: string[];
   skillsAllowed?: string[];
   allowInternalKnowledgeFallback?: boolean;
+  allowedZones?: { path: string, permissions: string[] }[];
 }
 
 export interface ChatMessage {

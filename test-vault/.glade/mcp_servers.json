@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:gemini-cli-extensions/workspace"
+      ],
+      "env": {}
+    }
+  }
+}

@@ -1,10 +1,8 @@
-import { test, expect } from '@playwright/test';
-import * as path from 'path';
+import { test, expect } from './fixtures/vault-fixture';
 
 test.describe('Window Management State Synchronization', () => {
-  const VAULT_PATH = path.join(process.cwd(), 'test-vault');
 
-  test('should synchronize state between Editor window and Agent Workspace window', async ({ browser }) => {
+  test('should synchronize state between Editor window and Agent Workspace window', async ({ browser, dynamicVaultPath }) => {
     // 1. Open the primary Editor window
     const context1 = await browser.newContext();
     const page1 = await context1.newPage();
@@ -12,7 +10,7 @@ test.describe('Window Management State Synchronization', () => {
     await page1.goto('/');
     await page1.evaluate((vaultPath) => {
       localStorage.setItem('glade_vaultPath', vaultPath);
-    }, VAULT_PATH);
+    }, dynamicVaultPath);
     await page1.reload();
     
     await expect(page1.locator('text=Select a file to start editing.')).toBeVisible();
@@ -24,7 +22,7 @@ test.describe('Window Management State Synchronization', () => {
     await page2.goto('/?view=agent');
     await page2.evaluate((vaultPath) => {
       localStorage.setItem('glade_vaultPath', vaultPath);
-    }, VAULT_PATH);
+    }, dynamicVaultPath);
     await page2.reload();
 
     // Verify Agent Workspace loaded

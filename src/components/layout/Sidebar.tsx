@@ -88,17 +88,21 @@ export default function Sidebar({
       </div>
       
       <div className="sidebar-footer" style={{ borderTop: '1px solid var(--background-modifier-border)', display: 'flex', justifyContent: 'flex-end', padding: '3px 16px', gap: '8px' }}>
-        {sidebarView === 'explorer' && vaultPath && (
+        {sidebarView === 'explorer' && (
           <>
             <button className="icon-btn" onClick={onOpenVault} title="Open Vault" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FolderOpen size={16} />
             </button>
-            <button className="icon-btn" onClick={() => onCreateFile(vaultPath)} title="New File" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FilePlus size={16} />
-            </button>
-            <button className="icon-btn" onClick={() => onCreateFolder(vaultPath)} title="New Folder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FolderPlus size={16} />
-            </button>
+            {vaultPath && (
+              <>
+                <button className="icon-btn" onClick={() => onCreateFile(vaultPath)} title="New File" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FilePlus size={16} />
+                </button>
+                <button className="icon-btn" onClick={() => onCreateFolder(vaultPath)} title="New Folder" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FolderPlus size={16} />
+                </button>
+              </>
+            )}
           </>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { listen } from '../../utils/api';
 export type TraceEvent = 
   | 'StepStarted'
   | 'Completed'

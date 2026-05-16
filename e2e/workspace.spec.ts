@@ -1,17 +1,15 @@
-import { test, expect } from '@playwright/test';
-import * as path from 'path';
+import { test, expect } from './fixtures/vault-fixture';
 
 test.describe('Agent Workspace Phase 2', () => {
-  const VAULT_PATH = path.join(process.cwd(), 'test-vault');
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, dynamicVaultPath }) => {
     // Open the app and load the test vault
     await page.goto('/');
     
     // Auto-open vault by setting localStorage
     await page.evaluate((vaultPath) => {
       localStorage.setItem('glade_vaultPath', vaultPath);
-    }, VAULT_PATH);
+    }, dynamicVaultPath);
     
     await page.reload();
   });

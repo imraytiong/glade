@@ -1290,7 +1290,7 @@ pub async fn invoke_agent_stream(
 mod tests;
 
 #[cfg(test)]
-mod tests {
+mod parse_tests {
     use super::*;
 
     #[test]
@@ -1306,6 +1306,8 @@ mod tests {
             skills_allowed: Some(vec![]),
             allow_internal_knowledge_fallback: Some(true),
             tools_requiring_approval: None,
+            allowed_zones: None,
+            context_bank: None,
         };
 
         let md = write_agent_markdown(&agent).unwrap();

@@ -46,6 +46,8 @@ async fn test_mock_coordinator_routing_success() {
         &[ChatMessage { role: "user".into(), content: "What does the document say?".into() }],
         "This document is about testing.",
         Some(&base_url),
+        None,
+        None,
         None
     ).await;
     
@@ -75,6 +77,8 @@ async fn test_mock_401_unauthorized() {
         &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
+        None,
+        None,
         None
     ).await;
     
@@ -105,6 +109,8 @@ async fn test_mock_503_service_unavailable() {
         &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
+        None,
+        None,
         None
     ).await;
     
@@ -134,6 +140,8 @@ async fn test_mock_malformed_json_response() {
         &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
+        None,
+        None,
         None
     ).await;
     
@@ -165,6 +173,8 @@ async fn test_mock_empty_llm_response() {
         &[ChatMessage { role: "user".into(), content: "Query".into() }],
         "",
         Some(&base_url),
+        None,
+        None,
         None
     ).await;
     
@@ -195,6 +205,8 @@ async fn test_live_coordinator_routing() {
         &[ChatMessage { role: "user".into(), content: "What is the secret word in the document?".into() }],
         "The secret word is 'Antigravity'.",
         None,
+        None,
+        None,
         None
     ).await;
     
@@ -221,6 +233,8 @@ async fn test_live_refactor_formatting() {
         "gemini-1.5-flash",
         &[ChatMessage { role: "user".into(), content: "Make this a bulleted list: apple, banana, cherry".into() }],
         "",
+        None,
+        None,
         None,
         None
     ).await;

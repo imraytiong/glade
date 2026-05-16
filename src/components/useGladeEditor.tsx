@@ -69,6 +69,11 @@ export interface EditorProps {
 export function useGladeEditor(props: EditorProps) {
   const pluginViewFactory = usePluginViewFactory();
   const nodeViewFactory = useNodeViewFactory();
+  const propsRef = React.useRef(props);
+
+  React.useEffect(() => {
+    propsRef.current = props;
+  }, [props]);
 
   const customImageView = React.useMemo(() => {
     return $view(imageSchema.node, () => nodeViewFactory({ 
@@ -120,7 +125,7 @@ export function useGladeEditor(props: EditorProps) {
 
         ctx.get(listenerCtx).markdownUpdated((_ctx, markdown, prevMarkdown) => {
           if (markdown !== prevMarkdown) {
-            props.onSave(markdown);
+            propsRef.current.onSave(markdown);
           }
         });
 
@@ -128,8 +133,8 @@ export function useGladeEditor(props: EditorProps) {
           const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
           const charCount = text.length;
           const readingTime = wordCount / 200;
-          if (props.onStatsChange) {
-            props.onStatsChange({ wordCount, charCount, readingTime });
+          if (propsRef.current.onStatsChange) {
+            propsRef.current.onStatsChange({ wordCount, charCount, readingTime });
           }
         };
 

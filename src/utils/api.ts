@@ -1,13 +1,13 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { listen as tauriListen, EventCallback, UnlistenFn } from '@tauri-apps/api/event';
+
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 /**
  * A wrapper around Tauri's invoke that falls back to HTTP POST requests
  * when running in headless mode (e.g. Playwright testing).
  */
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  // Check if we are running in Tauri
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
   if (isTauri) {
     return tauriInvoke<T>(cmd, args);
   } else {
@@ -42,6 +42,11 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
       return undefined as T;
     }
     
+    // Do not auto-parse if the command is meant to return raw text
+    if (cmd === 'fs_read_text_file') {
+      return text as unknown as T;
+    }
+
     try {
       return JSON.parse(text) as T;
     } catch (e) {
@@ -50,3 +55,27 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
     }
   }
 }
+
+export async function listen<T>(event: string, handler: EventCallback<T>): Promise<UnlistenFn> {
+  if (isTauri) {
+    return tauriListen(event, handler);
+  }
+  
+  // Mock listener for E2E tests
+  const wrapper = (e: Event) => {
+    const customEvent = e as CustomEvent;
+    if (customEvent.detail && customEvent.detail.event === event) {
+      handler({
+        event: event,
+        id: Math.random(),
+        payload: customEvent.detail.payload as T
+      });
+    }
+  };
+  
+  window.addEventListener('mock-tauri-event', wrapper);
+  return () => {
+    window.removeEventListener('mock-tauri-event', wrapper);
+  };
+}
+

@@ -1,0 +1,352 @@
+Mock LLM Server running on port 1422
+
+Running 2 tests using 1 worker
+
+[1A[2K[1/2] [chromium] › e2e/agent.spec.ts:25:3 › Agent Management E2E › should create a new agent via the UI
+[1A[2K[chromium] › e2e/agent.spec.ts:25:3 › Agent Management E2E › should create a new agent via the UI
+BROWSER CONSOLE: [vite] connecting...
+
+[1A[2KBROWSER CONSOLE: [vite] connected.
+
+[1A[2KBROWSER CONSOLE: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER CONSOLE: TraceView useEffect started
+
+[1A[2KBROWSER CONSOLE: TraceView useEffect started
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:47:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:47:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:60:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:60:37
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/agent/AgentView.tsx:217:37
+    at async Promise.all (index 0)
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/agent/AgentView.tsx:230:37
+    at async Promise.all (index 1)
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at reconnectPassiveEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11273:13)
+    at recursivelyTraverseReconnectPassiveEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11240:11)
+    at reconnectPassiveEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11317:13)
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-rl4G0k/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KName input value: Test E2E Agent
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KDesc input value: A test agent for e2e validation.
+
+[1A[2KBROWSER CONSOLE: ProseMirror expects the CSS white-space property to be set, preferably to 'pre-wrap'. It is recommended to load style/prosemirror.css from the prosemirror-view package.
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KBROWSER CONSOLE: === handleSaveAgent ===
+
+[1A[2KBROWSER CONSOLE: formData keys: [id, name, system_prompt, model_class, tools_allowed, skills_allowed, tools_requiring_approval, context_bank, allowed_zones, description]
+
+[1A[2KBROWSER CONSOLE: formData.name: Test E2E Agent
+
+[1A[2KBROWSER CONSOLE: formData.description: A test agent for e2e validation.
+
+[1A[2KBROWSER CONSOLE: formData.system_prompt: This is the system prompt.
+
+
+[1A[2KBROWSER CONSOLE: Full agent: {id: agent_1778889418921, name: Test E2E Agent, system_prompt: This is the system prompt.
+, model_class: fast, tools_allowed: Array(7)}
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KPOLL FOUND FILE: agent_1778889418921.agent.md, CONTENT: ---
+name: Test E2E Agent
+description: A test agent for e2e validation.
+model_class: fast
+tools_allow
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2KBROWSER CONSOLE: Failed to get current webview (likely not running in Tauri): TypeError: Cannot read properties of undefined (reading 'metadata')
+    at getCurrentWindow (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:328:48)
+    at getCurrentWebview (http://localhost:1420/node_modules/.vite/deps/@tauri-apps_api_webview.js?v=23dab613:2022:22)
+    at http://localhost:1420/src/components/Editor.tsx:38:23
+    at Object.react_stack_bottom_frame (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:18567:20)
+    at runWithFiberInDEV (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:997:72)
+    at commitHookEffectListMount (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:1420/node_modules/.vite/deps/react-dom_client.js?v=23dab613:11201:13)
+
+[1A[2K[2/2] [chromium] › e2e/agent.spec.ts:76:3 › Agent Management E2E › should modify an existing agent
+[1A[2K[chromium] › e2e/agent.spec.ts:76:3 › Agent Management E2E › should modify an existing agent
+BROWSER CONSOLE: [vite] connecting...
+
+[1A[2KBROWSER CONSOLE: [vite] connected.
+
+[1A[2KBROWSER CONSOLE: %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER CONSOLE: TraceView useEffect started
+
+[1A[2KBROWSER CONSOLE: TraceView useEffect started
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc) returned: [Object, Object, Object, Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/2-Areas) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:47:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:60:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:47:37
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/ecosystem/ToolsView.tsx:60:37
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/4-Daily-Notes) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/5-Archive) returned: [Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/3-Resources) returned: [Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: readDir(/var/folders/v2/zbzx34n936765qf6zkflldd00000gn/T/glade-test-0-ECgjHc/1-Projects) returned: [Object, Object, Object]
+
+[1A[2KBROWSER CONSOLE: Failed to parse mcp_servers.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/agent/AgentView.tsx:217:37
+    at async Promise.all (index 0)
+
+[1A[2KBROWSER CONSOLE: Failed to parse local_tools.json SyntaxError: "[object Object]" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at http://localhost:1420/src/components/agent/AgentView.tsx:230:37
+    at async Promise.all (index 1)
+
+[1A[2K  1) [chromium] › e2e/agent.spec.ts:76:3 › Agent Management E2E › should modify an existing agent ──
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.fill: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('label').filter({ hasText: /^Name$/ }).locator('..').locator('input[type="text"]')[22m
+
+
+      84 |     // Change the name
+      85 |     const nameInput = page.locator('label').filter({ hasText: /^Name$/ }).locator('..').locator('input[type="text"]');
+    > 86 |     await nameInput.fill('Modified Blog Generator');
+         |                     ^
+      87 |     await page.waitForTimeout(500);
+      88 |
+      89 |     // Save
+        at /Users/raytiong/projects/glade/e2e/agent.spec.ts:86:21
+
+    attachment #1: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/agent-Agent-Management-E2E-should-modify-an-existing-agent-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/agent-Agent-Management-E2E-should-modify-an-existing-agent-chromium/error-context.md
+
+
+[1A[2K  1 failed
+    [chromium] › e2e/agent.spec.ts:76:3 › Agent Management E2E › should modify an existing agent ───
+  1 passed (34.6s)
+
+  Serving HTML report at http://localhost:60899. Press Ctrl+C to quit.

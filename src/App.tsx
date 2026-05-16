@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
+  readVaultRecursive,
+  FileNode,
+  flattenFiles,
   readTextFile,
   writeTextFile,
+  mkdir,
   rename,
   remove,
-  mkdir,
   copyFile,
+  openDialog,
 } from "./utils/fs";
 import {
   Settings,
@@ -20,7 +23,6 @@ import {
   Zap,
   Activity
 } from "lucide-react";
-import { FileNode, readVaultRecursive, flattenFiles } from "./utils/fs";
 import { globalIndexer } from "./utils/indexer";
 import { Command } from "./utils/commands";
 import { useSettings } from "./utils/settings";
@@ -204,16 +206,9 @@ function App() {
   const loadVaultFiles = useCallback(async (path: string) => {
     try {
       const nodes = await readVaultRecursive(path);
-      if (nodes.length === 0) {
-        // If it's empty or we lack permissions (silent fail in readVaultRecursive), reset.
-        setVaultPath(null);
-        setFileTree([]);
-        globalIndexer.setFiles([]);
-      } else {
-        setFileTree(nodes);
-        const flatFiles = flattenFiles(nodes);
-        globalIndexer.indexFiles(flatFiles);
-      }
+      setFileTree(nodes);
+      const flatFiles = flattenFiles(nodes);
+      globalIndexer.indexFiles(flatFiles);
     } catch (err) {
       setVaultPath(null);
       setFileTree([]);
@@ -279,7 +274,7 @@ function App() {
   }, [activeFileIndex, openFiles]);
 
   const handleOpenVault = async () => {
-    const selected = await open({
+    const selected = await openDialog({
       directory: true,
       multiple: false,
     });
@@ -1300,7 +1295,7 @@ function App() {
                 >
                   <strong>Extreme Alpha Warning</strong>
                   <br />
-                  This is an early alpha release (0.0.1-alpha.1) and is not
+                  This is an early alpha release (0.0.1-alpha.6) and is not
                   ready for production use. Please make a copy of your valued
                   markdown vaults before opening them with Glade.
                 </div>

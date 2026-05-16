@@ -1,6 +1,6 @@
 [package]
 name = "glade"
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.6"
 description = "A modern Markdown knowledge base and IDE"
 authors = ["you"]
 edition = "2021"
@@ -46,6 +46,7 @@ notify = "8.2.0"
 notify-debouncer-mini = "0.7.0"
 
 [dev-dependencies]
+tempfile = "3.27.0"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros"] }
 wiremock = "0.6.5"
 

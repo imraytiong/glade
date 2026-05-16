@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, Save, Brain, Code } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../utils/api';
 import yaml from 'yaml';
 import { GladeEditor } from '../Editor';
 

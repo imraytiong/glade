@@ -95,8 +95,9 @@ pub async fn call_gemini(
     request: &GeminiRequest,
     base_url: Option<&str>
 ) -> Result<GeminiResponse, Box<dyn std::error::Error>> {
+    let env_url = std::env::var("GEMINI_BASE_URL").ok();
     let default_url = "https://generativelanguage.googleapis.com";
-    let url_base = base_url.unwrap_or(default_url);
+    let url_base = base_url.or(env_url.as_deref()).unwrap_or(default_url);
     let url = format!("{}/v1beta/models/{}:generateContent?key={}", url_base, model, api_key);
     
     let client = reqwest::Client::new();
@@ -143,8 +144,9 @@ pub fn call_gemini_stream(
     request: &GeminiRequest,
     base_url: Option<&str>
 ) -> Result<impl futures::stream::Stream<Item = Result<GeminiResponse, String>>, String> {
+    let env_url = std::env::var("GEMINI_BASE_URL").ok();
     let default_url = "https://generativelanguage.googleapis.com";
-    let url_base = base_url.unwrap_or(default_url);
+    let url_base = base_url.or(env_url.as_deref()).unwrap_or(default_url);
     let url = format!("{}/v1beta/models/{}:streamGenerateContent?alt=sse&key={}", url_base, model, api_key);
     
     let client = reqwest::Client::new();
